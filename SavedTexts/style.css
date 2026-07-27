@@ -131,21 +131,47 @@
     overflow: hidden;
 }
 
-.vc-saved-texts-card-paste-count {
+.vc-saved-texts-card-paste-row {
     position: absolute;
     left: 8px;
     bottom: 8px;
     z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    pointer-events: auto;
+}
+
+.vc-saved-texts-card-paste-count {
     padding: 3px 8px;
     border-radius: 4px;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgb(0, 0, 0);
     color: #fff;
     font-size: 10px;
     font-weight: 600;
     line-height: 1.2;
     letter-spacing: 0.02em;
-    pointer-events: none;
     white-space: nowrap;
+    pointer-events: none;
+}
+
+.vc-saved-texts-paste-edit-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: rgb(0, 0, 0);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.vc-saved-texts-paste-edit-btn:hover {
+    background: rgb(40, 40, 40);
 }
 
 .vc-saved-texts-card-actions {

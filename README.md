@@ -120,17 +120,11 @@ Removes the Nitro **gift button** from the chat input bar.
 
 ## Publishing Changes
 
-Every push to `master` automatically creates a **new release** (patch bump: `v1.0.0` → `v1.0.1` → `v1.0.2`, …):
-
-1. Collects commits since the previous tag
-2. Creates a new git tag and GitHub Release
-3. Saves release notes to `RELEASE_NOTES_LATEST.md`
+Every push to `master` automatically creates a **new GitHub Release** (patch bump). Release notes appear on the [Releases](https://github.com/Xaenny/VencordPlugins/releases) page only — nothing is committed back to the repo by a bot.
 
 To skip a release, include `[skip release]` in your commit message.
 
-For manual major/minor bumps, create the tag yourself before pushing (e.g. `git tag v1.1.0`) — the next auto-release will continue from there.
-
-`RELEASE_TEMPLATE.md` is kept for reference but is no longer appended to every release.
+For manual major/minor bumps, tag before pushing (e.g. `git tag v1.1.0 && git push origin v1.1.0`).
 
 ---
 

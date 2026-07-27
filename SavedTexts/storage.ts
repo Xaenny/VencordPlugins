@@ -51,6 +51,15 @@ export async function incrementPasteCount(id: string) {
     );
 }
 
+export async function setPasteCount(id: string, count: number) {
+    const safeCount = Math.max(0, Math.floor(count));
+    await DataStore.update(STORE_KEY, (items: SavedText[] | undefined) =>
+        (items ?? []).map(item =>
+            item.id === id ? { ...item, pasteCount: safeCount } : item
+        )
+    );
+}
+
 export function makeDefaultName(text: string) {
     const oneLine = text.replace(/\s+/g, " ").trim();
     if (oneLine.length <= 40) return oneLine || "Saved text";

@@ -14,4 +14,10 @@ export const settings = definePluginSettings({
         description: "Show how many times each saved text has been pasted",
         default: true,
     },
+    allowEditPasteCount: {
+        type: OptionType.BOOLEAN,
+        description: "Show a button to manually edit paste counts on text cards",
+        default: false,
+        hidden: () => !settings.store.showPasteCount,
+    },
 });

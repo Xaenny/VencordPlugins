@@ -13,7 +13,7 @@ import { RenderModalProps } from "@vencord/discord-types";
 
 import { useResizeObserver, useVirtualizedMasonry } from "../FavoriteMedia/utils";
 import { settings } from "./settings";
-import { addSavedText, getPasteCount, getSavedTexts, incrementPasteCount, makeDefaultName, removeSavedText, SavedText, updateSavedText } from "./storage";
+import { addSavedText, getPasteCount, getSavedTexts, incrementPasteCount, makeDefaultName, removeSavedText, SavedText, setPasteCount, updateSavedText } from "./storage";
 
 interface ManaSearchBarProps {
     autoFocus?: boolean;
@@ -135,22 +135,76 @@ export function openEditTextModal(item?: SavedText, onSaved?: () => void, initia
     ));
 }
 
+function EditPasteCountModal({
+    item,
+    onSaved,
+    ...props
+}: RenderModalProps & {
+    item: SavedText;
+    onSaved?: () => void;
+}) {
+    const [count, setCount] = useState(String(getPasteCount(item)));
+
+    return (
+        <Modal
+            {...props}
+            title="Edit Paste Count"
+            actions={[
+                {
+                    text: "Cancel",
+                    variant: "secondary",
+                    onClick: props.onClose
+                },
+                {
+                    text: "Save",
+                    variant: "primary",
+                    onClick: async () => {
+                        const parsed = Number.parseInt(count, 10);
+                        await setPasteCount(item.id, Number.isFinite(parsed) ? parsed : 0);
+                        onSaved?.();
+                        props.onClose();
+                    }
+                }
+            ]}
+        >
+            <Forms.FormSection>
+                <Forms.FormTitle tag="h5">Paste count</Forms.FormTitle>
+                <TextInput
+                    value={count}
+                    onChange={value => setCount(value.replace(/\D/g, ""))}
+                    placeholder="0"
+                />
+            </Forms.FormSection>
+        </Modal>
+    );
+}
+
+function openEditPasteCountModal(item: SavedText, onSaved?: () => void) {
+    openModal(props => (
+        <EditPasteCountModal {...props} item={item} onSaved={() => onSaved?.()} />
+    ));
+}
+
 function TextCard({
     item,
     layout,
     previewCharLimit,
     showPasteCount,
+    allowEditPasteCount,
     onSelect,
     onEdit,
     onDelete,
+    onEditPasteCount,
 }: {
     item: SavedText;
     layout: { left: number; top: number; width: number; height: number; };
     previewCharLimit: number;
     showPasteCount: boolean;
+    allowEditPasteCount: boolean;
     onSelect: (item: SavedText) => void;
     onEdit: (item: SavedText) => void;
     onDelete: (item: SavedText) => void;
+    onEditPasteCount: (item: SavedText) => void;
 }) {
     const preview = truncatePreview(item.text, previewCharLimit);
     const title = item.name.trim() || makeDefaultName(item.text);
@@ -182,8 +236,23 @@ function TextCard({
             </div>
 
             {showPasteCount && (
-                <div className="vc-saved-texts-card-paste-count" aria-label={`Pasted ${pasteCount} times`}>
-                    {pasteCount} {pasteCount === 1 ? "paste" : "pastes"}
+                <div className="vc-saved-texts-card-paste-row">
+                    <div className="vc-saved-texts-card-paste-count" aria-label={`Pasted ${pasteCount} times`}>
+                        {pasteCount} {pasteCount === 1 ? "paste" : "pastes"}
+                    </div>
+                    {allowEditPasteCount && (
+                        <button
+                            type="button"
+                            className="vc-saved-texts-paste-edit-btn"
+                            aria-label={`Edit paste count for ${title}`}
+                            onClick={e => {
+                                e.stopPropagation();
+                                onEditPasteCount(item);
+                            }}
+                        >
+                            <PencilIcon height={12} width={12} />
+                        </button>
+                    )}
                 </div>
             )}
 
@@ -220,7 +289,7 @@ export function TextPicker({ onSelectItem }: { onSelectItem: (text: string) => v
     const [items, setItems] = useState<SavedText[]>([]);
     const [loading, setLoading] = useState(true);
     const [containerWidth, setContainerWidth] = useState(496);
-    const { previewCharLimit, showPasteCount } = settings.use(["previewCharLimit", "showPasteCount"]);
+    const { previewCharLimit, showPasteCount, allowEditPasteCount } = settings.use(["previewCharLimit", "showPasteCount", "allowEditPasteCount"]);
 
     const { query } = ExpressionPickerStore.useExpressionPickerStore(store => ({
         query: store.searchQuery as string
@@ -278,6 +347,12 @@ export function TextPicker({ onSelectItem }: { onSelectItem: (text: string) => v
         openEditTextModal(item, reload);
     }, []);
 
+    const handleEditPasteCount = useCallback((item: SavedText) => {
+        openEditPasteCountModal(item, async () => {
+            setItems(await getSavedTexts());
+        });
+    }, []);
+
     const handleDelete = useCallback(async (item: SavedText) => {
         await removeSavedText(item.id);
         await reload();
@@ -332,9 +407,11 @@ export function TextPicker({ onSelectItem }: { onSelectItem: (text: string) => v
                                         layout={layout[i]}
                                         previewCharLimit={previewCharLimit}
                                         showPasteCount={showPasteCount}
+                                        allowEditPasteCount={allowEditPasteCount}
                                         onSelect={handleSelect}
                                         onEdit={handleEdit}
                                         onDelete={handleDelete}
+                                        onEditPasteCount={handleEditPasteCount}
                                     />
                                 ))}
                             </div>
