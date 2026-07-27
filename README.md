@@ -1,4 +1,4 @@
-# Vencord User Plugins by Xaenny
+# Vencord User Plugins by [Zensoran](https://github.com/Zensoran)
 
 A collection of custom [Vencord](https://github.com/Vendicated/Vencord) userplugins — quality-of-life tools for Discord's chat bar, media picker, and loading screen.
 
@@ -122,11 +122,11 @@ Removes the Nitro **gift button** from the chat input bar.
 
 | Plugin | Authors |
 |---|---|
-| **BetterFormattingRedux** | [Zerebos](https://github.com/zerebos) (original BD plugin), **Xaenny** (Vencord port) |
-| **CustomLoadingLogo** | **Xaenny** |
-| **FavoriteMedia** | [nin0dev](https://git.nin0.dev/nin0), [Davri](https://github.com/Davr1), [TetraSsky](https://github.com/TetraSsky) (upstream), **Xaenny** (customizations) |
-| **SavedTexts** | **Xaenny** |
-| **HideGiftButton** | **Xaenny** |
+| **BetterFormattingRedux** | [Zerebos](https://github.com/zerebos) (original BD plugin), [Zensoran](https://github.com/Zensoran) (Vencord port) |
+| **CustomLoadingLogo** | [Zensoran](https://github.com/Zensoran) |
+| **FavoriteMedia** | [nin0dev](https://git.nin0.dev/nin0), [Davri](https://github.com/Davr1), [TetraSsky](https://github.com/TetraSsky) (upstream), [Zensoran](https://github.com/Zensoran) (customizations) |
+| **SavedTexts** | [Zensoran](https://github.com/Zensoran) |
+| **HideGiftButton** | [Zensoran](https://github.com/Zensoran) |
 
 ---
 

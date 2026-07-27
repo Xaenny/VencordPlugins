@@ -57,7 +57,7 @@ function VideoIcon({ height = 20, width = 20, className }: { height?: number; wi
 export default definePlugin({
     name: "FavoriteMedia",
     description: "Save images, videos, and files as favourites in the GIF/Media picker — like BetterDiscord FavoriteMedia",
-    authors: [Devs.nin0dev, { name: "Davri", id: 457579346282938368n }, { name: "Xaenny", id: 0n }],
+    authors: [Devs.nin0dev, { name: "Davri", id: 457579346282938368n }, { name: "Zensoran", id: 0n }],
     managedStyle,
     settings,
     patches: [
