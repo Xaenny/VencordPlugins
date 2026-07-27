@@ -2,3 +2,5 @@
 .DS_Store
 Thumbs.db
 *.log
+release-body.md
+RELEASE_NOTES*.md

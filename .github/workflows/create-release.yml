@@ -47,8 +47,6 @@ jobs:
             "${{ steps.version.outputs.prev_tag }}" \
             "${{ steps.version.outputs.new_tag }}" \
             release-body.md
-          cp release-body.md "RELEASE_NOTES_${{ steps.version.outputs.new_tag }}.md"
-          cp release-body.md RELEASE_NOTES_LATEST.md
           echo "----- Release body -----"
           cat release-body.md
 
@@ -65,9 +63,3 @@ jobs:
             --repo "${{ github.repository }}" \
             --title "${NEW_TAG}" \
             --notes-file release-body.md
-
-      - name: Commit release notes snapshot
-        run: |
-          git add RELEASE_NOTES_LATEST.md "RELEASE_NOTES_${{ steps.version.outputs.new_tag }}.md"
-          git commit -m "chore: add release notes for ${{ steps.version.outputs.new_tag }} [skip release]"
-          git push
