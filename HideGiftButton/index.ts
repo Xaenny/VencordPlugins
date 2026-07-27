@@ -76,7 +76,7 @@ function updateDynamicStyle() {
 export default definePlugin({
     name: "HideGiftButton",
     description: "Removes the Nitro gift button from the chat input bar",
-    authors: [{ name: "Zensoran", id: 0n }],
+    authors: [{ name: "Xaenny", id: 0n }],
 
     settings,
     managedStyle: fallbackStyle,

@@ -62,11 +62,11 @@ First public release of a custom Vencord userplugin collection — five plugins 
 
 | Plugin | Authors |
 |---|---|
-| BetterFormattingRedux | Zerebos, **[Zensoran](https://github.com/Zensoran)** |
-| CustomLoadingLogo | **[Zensoran](https://github.com/Zensoran)** |
-| FavoriteMedia | nin0dev, Davri, **[Zensoran](https://github.com/Zensoran)** |
-| SavedTexts | **[Zensoran](https://github.com/Zensoran)** |
-| HideGiftButton | **[Zensoran](https://github.com/Zensoran)** |
+| BetterFormattingRedux | Zerebos, **[Xaenny](https://github.com/Xaenny)** |
+| CustomLoadingLogo | **[Xaenny](https://github.com/Xaenny)** |
+| FavoriteMedia | nin0dev, Davri, **[Xaenny](https://github.com/Xaenny)** |
+| SavedTexts | **[Xaenny](https://github.com/Xaenny)** |
+| HideGiftButton | **[Xaenny](https://github.com/Xaenny)** |
 
 ---
 

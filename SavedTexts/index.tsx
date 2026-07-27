@@ -92,7 +92,7 @@ const messageContextMenuPatch: NavContextMenuPatchCallback = (children, { messag
 export default definePlugin({
     name: "SavedTexts",
     description: "Save and reuse text snippets from a chat bar button in the GIF picker window",
-    authors: [{ name: "Zensoran", id: 0n }],
+    authors: [{ name: "Xaenny", id: 0n }],
     dependencies: ["ChatInputButtonAPI"],
     settings,
 

@@ -70,7 +70,7 @@ let settingsListener: (() => void) | null = null;
 export default definePlugin({
     name: "CustomLoadingLogo",
     description: "Replace Discord's loading logo with a custom image while keeping the original animation",
-    authors: [{ name: "Zensoran", id: 0n }],
+    authors: [{ name: "Xaenny", id: 0n }],
     settings,
     managedStyle,
     startAt: StartAt.Init,

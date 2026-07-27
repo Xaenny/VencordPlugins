@@ -539,7 +539,7 @@ function isChatBarTarget(props: ChatBarProps) {
 export default definePlugin({
     name: "BetterFormattingRedux",
     description: "Format messages with a toolbar above the chat box. Adds superscript, smallcaps, fullwidth, and more.",
-    authors: [{ name: "Zerebos", id: 249746236008169473n }, { name: "Zensoran", id: 0n }],
+    authors: [{ name: "Zerebos", id: 249746236008169473n }, { name: "Xaenny", id: 0n }],
     dependencies: ["ChatInputButtonAPI"],
     settings,
 
