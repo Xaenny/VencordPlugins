@@ -132,4 +132,19 @@ Removes the Nitro **gift button** from the chat input bar.
 
 ## License
 
-Individual plugins may carry their own licenses (see each plugin folder). Upstream FavoriteMedia components are based on open-source community work — please respect original authors' licenses when redistributing.
+### Original plugins by [Xaenny](https://github.com/Xaenny)
+
+**CustomLoadingLogo**, **SavedTexts**, and **HideGiftButton** are licensed under the **MIT License (with Attribution Requirements)**. See each plugin's `LICENSE` file for the full text.
+
+If you redistribute, republish, or share a modified version, you must:
+
+- Credit **Xaenny** with a link to [https://github.com/Xaenny](https://github.com/Xaenny)
+- Clearly state if you made changes
+- Keep the license and copyright notice intact
+- Not claim original authorship or misrepresent where the plugin came from
+
+### Third-party plugins
+
+**BetterFormattingRedux** is a port of [Zerebos](https://github.com/zerebos)' BetterDiscord plugin — see upstream license.
+
+**FavoriteMedia** is based on community work by [nin0dev](https://git.nin0.dev/nin0), [Davri](https://github.com/Davr1), and [TetraSsky](https://github.com/TetraSsky) — respect their licenses when redistributing.
