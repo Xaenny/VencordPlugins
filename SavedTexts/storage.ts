@@ -5,6 +5,7 @@ export interface SavedText {
     name: string;
     text: string;
     createdAt: number;
+    pasteCount?: number;
 }
 
 const STORE_KEY = "SavedTexts_entries";
@@ -18,7 +19,8 @@ export async function addSavedText(name: string, text: string) {
         id: crypto.randomUUID(),
         name: name.trim() || makeDefaultName(text),
         text,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        pasteCount: 0
     };
 
     await DataStore.update(STORE_KEY, (items: SavedText[] | undefined) => [entry, ...(items ?? [])]);
@@ -34,6 +36,18 @@ export async function removeSavedText(id: string) {
 export async function updateSavedText(id: string, patch: Partial<Pick<SavedText, "name" | "text">>) {
     await DataStore.update(STORE_KEY, (items: SavedText[] | undefined) =>
         (items ?? []).map(item => item.id === id ? { ...item, ...patch } : item)
+    );
+}
+
+export function getPasteCount(item: SavedText) {
+    return item.pasteCount ?? 0;
+}
+
+export async function incrementPasteCount(id: string) {
+    await DataStore.update(STORE_KEY, (items: SavedText[] | undefined) =>
+        (items ?? []).map(item =>
+            item.id === id ? { ...item, pasteCount: getPasteCount(item) + 1 } : item
+        )
     );
 }
 

@@ -13,7 +13,7 @@ import { RenderModalProps } from "@vencord/discord-types";
 
 import { useResizeObserver, useVirtualizedMasonry } from "../FavoriteMedia/utils";
 import { settings } from "./settings";
-import { addSavedText, getSavedTexts, makeDefaultName, removeSavedText, SavedText, updateSavedText } from "./storage";
+import { addSavedText, getPasteCount, getSavedTexts, incrementPasteCount, makeDefaultName, removeSavedText, SavedText, updateSavedText } from "./storage";
 
 interface ManaSearchBarProps {
     autoFocus?: boolean;
@@ -37,7 +37,7 @@ export function truncatePreview(text: string, limit: number) {
     return text.slice(0, limit).trimEnd() + "…";
 }
 
-function estimateTextHeight(name: string, preview: string, colWidth: number) {
+function estimateTextHeight(name: string, preview: string, colWidth: number, showPasteCount: boolean) {
     const charsPerLine = Math.max(16, Math.floor(colWidth / 7.5));
     const nameLines = Math.min(2, Math.ceil(name.length / charsPerLine) || 1);
     const previewLines = Math.min(16, Math.ceil(preview.length / charsPerLine) || 1);
@@ -45,11 +45,12 @@ function estimateTextHeight(name: string, preview: string, colWidth: number) {
     const padding = 28;
     const nameHeight = nameLines * 20;
     const previewHeight = previewLines * 17;
+    const counterHeight = showPasteCount ? 22 : 0;
 
-    return Math.max(MIN_CARD_HEIGHT, padding + nameHeight + previewHeight + 8);
+    return Math.max(MIN_CARD_HEIGHT, padding + nameHeight + previewHeight + counterHeight + 8);
 }
 
-function computeTextLayout(items: SavedText[], containerWidth: number, previewCharLimit: number) {
+function computeTextLayout(items: SavedText[], containerWidth: number, previewCharLimit: number, showPasteCount: boolean) {
     const cols = Math.max(2, Math.round(containerWidth / 230));
     const colWidth = (containerWidth - TEXT_GUTTER * (cols + 1)) / cols;
     const colTops = Array<number>(cols).fill(TEXT_GUTTER);
@@ -57,7 +58,7 @@ function computeTextLayout(items: SavedText[], containerWidth: number, previewCh
     return items.map(item => {
         const preview = truncatePreview(item.text, previewCharLimit);
         const col = colTops.indexOf(Math.min(...colTops));
-        const itemHeight = estimateTextHeight(item.name, preview, colWidth);
+        const itemHeight = estimateTextHeight(item.name, preview, colWidth, showPasteCount);
         const layout = {
             left: TEXT_GUTTER + col * (colWidth + TEXT_GUTTER),
             top: colTops[col],
@@ -138,6 +139,7 @@ function TextCard({
     item,
     layout,
     previewCharLimit,
+    showPasteCount,
     onSelect,
     onEdit,
     onDelete,
@@ -145,12 +147,14 @@ function TextCard({
     item: SavedText;
     layout: { left: number; top: number; width: number; height: number; };
     previewCharLimit: number;
-    onSelect: (text: string) => void;
+    showPasteCount: boolean;
+    onSelect: (item: SavedText) => void;
     onEdit: (item: SavedText) => void;
     onDelete: (item: SavedText) => void;
 }) {
     const preview = truncatePreview(item.text, previewCharLimit);
     const title = item.name.trim() || makeDefaultName(item.text);
+    const pasteCount = getPasteCount(item);
 
     return (
         <div
@@ -164,11 +168,11 @@ function TextCard({
                 width: layout.width,
                 height: layout.height,
             }}
-            onClick={() => onSelect(item.text)}
+            onClick={() => onSelect(item)}
             onKeyDown={e => {
                 if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
-                    onSelect(item.text);
+                    onSelect(item);
                 }
             }}
         >
@@ -176,6 +180,12 @@ function TextCard({
                 <div className="vc-saved-texts-card-name">{title}</div>
                 <div className="vc-saved-texts-card-preview">{preview}</div>
             </div>
+
+            {showPasteCount && (
+                <div className="vc-saved-texts-card-paste-count" aria-label={`Pasted ${pasteCount} times`}>
+                    {pasteCount} {pasteCount === 1 ? "paste" : "pastes"}
+                </div>
+            )}
 
             <div className="vc-saved-texts-card-actions">
                 <button
@@ -210,7 +220,7 @@ export function TextPicker({ onSelectItem }: { onSelectItem: (text: string) => v
     const [items, setItems] = useState<SavedText[]>([]);
     const [loading, setLoading] = useState(true);
     const [containerWidth, setContainerWidth] = useState(496);
-    const { previewCharLimit } = settings.use(["previewCharLimit"]);
+    const { previewCharLimit, showPasteCount } = settings.use(["previewCharLimit", "showPasteCount"]);
 
     const { query } = ExpressionPickerStore.useExpressionPickerStore(store => ({
         query: store.searchQuery as string
@@ -241,8 +251,8 @@ export function TextPicker({ onSelectItem }: { onSelectItem: (text: string) => v
     }, [query]);
 
     const layout = useMemo(
-        () => computeTextLayout(filtered, containerWidth, previewCharLimit),
-        [filtered, containerWidth, previewCharLimit]
+        () => computeTextLayout(filtered, containerWidth, previewCharLimit, showPasteCount),
+        [filtered, containerWidth, previewCharLimit, showPasteCount]
     );
 
     const itemsBottom = useMemo(
@@ -253,6 +263,16 @@ export function TextPicker({ onSelectItem }: { onSelectItem: (text: string) => v
     const totalHeight = itemsBottom + TEXT_END_CONTAINER_HEIGHT + TEXT_GUTTER;
     const visibleIndices = useVirtualizedMasonry(scrollerRef, layout);
     const count = filtered.length;
+
+    const handleSelect = useCallback(async (item: SavedText) => {
+        await incrementPasteCount(item.id);
+        setItems(prev => prev.map(entry =>
+            entry.id === item.id
+                ? { ...entry, pasteCount: getPasteCount(entry) + 1 }
+                : entry
+        ));
+        onSelectItem(item.text);
+    }, [onSelectItem]);
 
     const handleEdit = useCallback((item: SavedText) => {
         openEditTextModal(item, reload);
@@ -311,7 +331,8 @@ export function TextPicker({ onSelectItem }: { onSelectItem: (text: string) => v
                                         item={filtered[i]}
                                         layout={layout[i]}
                                         previewCharLimit={previewCharLimit}
-                                        onSelect={onSelectItem}
+                                        showPasteCount={showPasteCount}
+                                        onSelect={handleSelect}
                                         onEdit={handleEdit}
                                         onDelete={handleDelete}
                                     />

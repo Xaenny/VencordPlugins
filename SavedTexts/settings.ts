@@ -9,4 +9,9 @@ export const settings = definePluginSettings({
         default: 200,
         stickToMarkers: false,
     },
+    showPasteCount: {
+        type: OptionType.BOOLEAN,
+        description: "Show how many times each saved text has been pasted",
+        default: true,
+    },
 });

@@ -99,7 +99,7 @@
     flex-direction: column;
     gap: 8px;
     height: 100%;
-    padding: 12px 14px;
+    padding: 12px 14px 30px;
     overflow: hidden;
     position: relative;
     z-index: 1;
@@ -129,6 +129,23 @@
     word-break: break-word;
     white-space: pre-line;
     overflow: hidden;
+}
+
+.vc-saved-texts-card-paste-count {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    z-index: 2;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    white-space: nowrap;
 }
 
 .vc-saved-texts-card-actions {
