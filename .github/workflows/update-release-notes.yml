@@ -1,0 +1,53 @@
+name: Update Release Notes
+
+on:
+  push:
+    branches:
+      - master
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  update-release-notes:
+    if: ${{ !contains(github.event.head_commit.message, '[skip release]') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build release notes
+        run: |
+          chmod +x scripts/build-release-notes.sh
+          ./scripts/build-release-notes.sh release-body.md
+          echo "----- Release body preview -----"
+          head -n 40 release-body.md
+          echo "..."
+          tail -n 20 release-body.md
+
+      - name: Update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo v1.0.0)"
+          echo "Updating release: ${TAG}"
+          gh release edit "${TAG}" --repo "${{ github.repository }}" --notes-file release-body.md
+
+      - name: Sync RELEASE_NOTES file
+        run: cp release-body.md RELEASE_NOTES_LATEST.md
+
+      - name: Commit synced release notes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add RELEASE_NOTES_LATEST.md
+          if git diff --staged --quiet; then
+            echo "No release notes changes to commit."
+            exit 0
+          fi
+          git commit -m "chore: sync auto-generated release notes [skip release]"
+          git push

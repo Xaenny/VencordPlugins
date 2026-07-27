@@ -118,6 +118,20 @@ Removes the Nitro **gift button** from the chat input bar.
 
 ---
 
+## Publishing Changes
+
+Push to `master` and GitHub Actions will automatically:
+
+1. Rebuild release notes from `RELEASE_TEMPLATE.md` + recent commits
+2. Update the latest GitHub Release (currently `v1.0.0`)
+3. Save a copy to `RELEASE_NOTES_LATEST.md` in the repo
+
+To skip a push, include `[skip release]` in your commit message.
+
+When you cut a new version, tag it (e.g. `git tag v1.1.0 && git push origin v1.1.0`) — the workflow uses the newest tag as the baseline for "Recent Changes".
+
+---
+
 ## Authors & Credits
 
 | Plugin | Authors |
