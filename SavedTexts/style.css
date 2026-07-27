@@ -1,0 +1,180 @@
+.vc-saved-texts-container {
+    background: var(--background-base-lower);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 320px;
+}
+
+.vc-saved-texts-header {
+    background: var(--background-surface-high);
+    border-bottom: 1px solid var(--border-subtle);
+    padding: var(--custom-gif-picker-gutter-size);
+    z-index: 1;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.vc-saved-texts-header .vc-saved-texts-search {
+    flex: 1;
+    min-width: 0;
+}
+
+.vc-saved-texts-add-btn {
+    flex-shrink: 0;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 4px;
+    border: none;
+    background: var(--brand-500);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.vc-saved-texts-add-btn:hover {
+    background: var(--brand-560);
+}
+
+.vc-saved-texts-body {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    flex: 1;
+    overflow: hidden;
+}
+
+.vc-saved-texts-body.vc-saved-texts-empty {
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    color: var(--text-muted);
+    font-size: 14px;
+    text-align: center;
+    padding: 24px;
+}
+
+.vc-saved-texts-grid {
+    overflow: hidden scroll;
+    padding-right: 0;
+    flex: 1;
+}
+
+.vc-saved-texts-grid-content {
+    position: relative;
+}
+
+.vc-saved-texts-grid-inner {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    top: 0;
+}
+
+.vc-saved-texts-card {
+    border: 3px solid var(--border-strong);
+    border-radius: 6px;
+    background: var(--background-secondary);
+    box-sizing: border-box;
+    cursor: pointer;
+    overflow: hidden;
+    position: relative;
+    isolation: isolate;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.vc-saved-texts-card:hover,
+.vc-saved-texts-card:focus-within {
+    border-color: var(--brand-500);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+
+.vc-saved-texts-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    height: 100%;
+    padding: 12px 14px;
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.vc-saved-texts-card-name {
+    flex-shrink: 0;
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 1.3;
+    color: #f2f3f5;
+    word-break: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.vc-saved-texts-card-preview {
+    flex: 1;
+    min-height: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #dcddde;
+    word-break: break-word;
+    white-space: pre-line;
+    overflow: hidden;
+}
+
+.vc-saved-texts-card-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 3;
+    pointer-events: auto;
+}
+
+.vc-saved-texts-card:hover .vc-saved-texts-card-actions,
+.vc-saved-texts-card:focus-within .vc-saved-texts-card-actions {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.vc-saved-texts-action-btn {
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.72);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.vc-saved-texts-action-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+}
+
+.vc-saved-texts-action-btn.danger:hover {
+    color: var(--status-danger);
+}
+
+.vc-saved-texts-editor textarea {
+    min-height: 280px;
+    max-height: 60vh;
+    line-height: 1.45;
+    font-size: 14px;
+}

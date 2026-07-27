@@ -1,0 +1,5 @@
+/* Fallback selectors — dynamic labels are injected at runtime in index.ts */
+[class*="channelTextArea"] button[aria-label="Send a gift" i],
+[class*="channelTextArea"] [class*="button"][aria-label="Send a gift" i] {
+    display: none !important;
+}
