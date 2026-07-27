@@ -120,15 +120,17 @@ Removes the Nitro **gift button** from the chat input bar.
 
 ## Publishing Changes
 
-Push to `master` and GitHub Actions will automatically:
+Every push to `master` automatically creates a **new release** (patch bump: `v1.0.0` → `v1.0.1` → `v1.0.2`, …):
 
-1. Rebuild release notes from `RELEASE_TEMPLATE.md` + recent commits
-2. Update the latest GitHub Release (currently `v1.0.0`)
-3. Save a copy to `RELEASE_NOTES_LATEST.md` in the repo
+1. Collects commits since the previous tag
+2. Creates a new git tag and GitHub Release
+3. Saves release notes to `RELEASE_NOTES_LATEST.md`
 
-To skip a push, include `[skip release]` in your commit message.
+To skip a release, include `[skip release]` in your commit message.
 
-When you cut a new version, tag it (e.g. `git tag v1.1.0 && git push origin v1.1.0`) — the workflow uses the newest tag as the baseline for "Recent Changes".
+For manual major/minor bumps, create the tag yourself before pushing (e.g. `git tag v1.1.0`) — the next auto-release will continue from there.
+
+`RELEASE_TEMPLATE.md` is kept for reference but is no longer appended to every release.
 
 ---
 

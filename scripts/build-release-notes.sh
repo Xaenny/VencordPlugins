@@ -4,32 +4,40 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-TEMPLATE="${ROOT}/RELEASE_TEMPLATE.md"
-OUTPUT="${1:-}"
-
-if [[ ! -f "$TEMPLATE" ]]; then
-    echo "Missing RELEASE_TEMPLATE.md" >&2
-    exit 1
-fi
-
-TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo "v1.0.0")"
+PREV_TAG="${1:?Previous tag required}"
+NEW_TAG="${2:?New tag required}"
+OUTPUT="${3:-release-body.md}"
+REPO="${GITHUB_REPOSITORY:-Xaenny/VencordPlugins}"
 GENERATED_AT="$(date -u +"%Y-%m-%d %H:%M UTC")"
 
 {
-    cat "$TEMPLATE"
+    echo "# Release ${NEW_TAG}"
     echo ""
-    echo "---"
+    echo "_Published: ${GENERATED_AT}_"
     echo ""
-    echo "## Recent Changes (since ${TAG})"
-    echo ""
-    echo "_Auto-updated: ${GENERATED_AT}_"
+    echo "## What's Changed"
     echo ""
 
-    COMMITS="$(git log "${TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges 2>/dev/null || true)"
+    COMMITS="$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges 2>/dev/null || true)"
 
     if [[ -n "$COMMITS" ]]; then
         echo "$COMMITS"
     else
-        echo "_No new commits since ${TAG}._"
+        echo "_Maintenance release._"
     fi
-} > "${OUTPUT:-/dev/stdout}"
+
+    echo ""
+    echo "---"
+    echo ""
+    echo "## Plugins in this repository"
+    echo ""
+    echo "- **BetterFormattingRedux** — formatting toolbar for chat"
+    echo "- **CustomLoadingLogo** — custom Discord loading screen logo"
+    echo "- **FavoriteMedia** — favourite images, videos, and files in the media picker"
+    echo "- **SavedTexts** — saved text snippets in the expression picker"
+    echo "- **HideGiftButton** — hide the Nitro gift button"
+    echo ""
+    echo "See the [README](https://github.com/${REPO}/blob/master/README.md) for installation, settings, and license details."
+} > "$OUTPUT"
+
+echo "Wrote ${OUTPUT}"
