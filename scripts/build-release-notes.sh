@@ -18,7 +18,7 @@ GENERATED_AT="$(date -u +"%Y-%m-%d %H:%M UTC")"
     echo "## What's Changed"
     echo ""
 
-    COMMITS="$(git log "${PREV_TAG}..HEAD" --pretty=format:"- %s (%h)" --no-merges 2>/dev/null || true)"
+    COMMITS="$(git log "${PREV_TAG}..HEAD" --reverse --pretty=format:"- %s (%h)%n%b" --no-merges 2>/dev/null || true)"
 
     if [[ -n "$COMMITS" ]]; then
         echo "$COMMITS"

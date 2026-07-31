@@ -147,20 +147,12 @@ export function FilePicker({ onSelectItem }: FilePickerProps) {
 }
 
 const IMAGE_GUTTER = 12;
-const IMAGE_COL_TARGET = 230;
-const VIDEO_COL_TARGET = IMAGE_COL_TARGET * 1.2;
 
-function computeMasonryLayout(
-    items: { width: number; height: number; }[],
-    containerWidth: number,
-    colTarget: number,
-    minCols: number,
-    useFloor = false,
-) {
-    const rawCols = useFloor
-        ? Math.floor(containerWidth / colTarget)
-        : Math.round(containerWidth / colTarget);
-    const cols = Math.max(minCols, rawCols);
+function computeImageLayout(items: { width: number; height: number; }[], containerWidth: number) {
+    // Discord's GIF tab uses absolute positioning for its grid rather than CSS columns
+    // column count and item dimensions were reverse-engineered from the DOM. Items are placed into whichever
+    // column has the smallest accumulated height matching Discord's "shortest-column-first" logic
+    const cols = Math.max(2, Math.round(containerWidth / 230));
     const colWidth = (containerWidth - IMAGE_GUTTER * (cols + 1)) / cols;
     const colTops = Array<number>(cols).fill(IMAGE_GUTTER);
 
@@ -178,14 +170,6 @@ function computeMasonryLayout(
         colTops[col] += itemHeight + IMAGE_GUTTER;
         return layout;
     });
-}
-
-function computeImageLayout(items: { width: number; height: number; }[], containerWidth: number) {
-    return computeMasonryLayout(items, containerWidth, IMAGE_COL_TARGET, 2);
-}
-
-function computeVideoLayout(items: { width: number; height: number; }[], containerWidth: number) {
-    return computeMasonryLayout(items, containerWidth, VIDEO_COL_TARGET, 1, true);
 }
 
 export function ImagePicker({ onSelectItem }: FilePickerProps) {
@@ -280,7 +264,7 @@ export function VideoPicker({ onSelectItem }: FilePickerProps) {
     useEffect(() => { scrollerRef.current?.scrollTo(0, 0); }, [query]);
 
     const layout = useMemo(
-        () => (favs ? computeVideoLayout(favs, containerWidth) : []),
+        () => (favs ? computeImageLayout(favs, containerWidth) : []),
         [favs, containerWidth]
     );
 
@@ -527,8 +511,13 @@ export function VideoPickerItem({ url, src, width, height, layout, onSubmit }: {
     );
 
     const attachment = useMemo(
-        () => createVideoAttachment(signedUrl, signedProxy, width, height),
-        [signedUrl, signedProxy, width, height]
+        () => createVideoAttachment(
+            signedUrl,
+            signedProxy,
+            Math.round(layout?.width ?? width),
+            Math.round(layout?.height ?? height),
+        ),
+        [signedUrl, signedProxy, layout?.width, layout?.height, width, height]
     );
 
     const [loaded, setLoaded] = useState(false);
@@ -566,9 +555,13 @@ export function VideoPickerItem({ url, src, width, height, layout, onSubmit }: {
         });
 
         observer.observe(container, { childList: true, subtree: true });
+
+        const fallbackLoaded = window.setTimeout(() => setLoaded(true), 800);
+
         return () => {
             observer.disconnect();
             cleanup?.();
+            window.clearTimeout(fallbackLoaded);
         };
     }, [isDirectVideo, attachment]);
 
