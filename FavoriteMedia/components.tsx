@@ -61,7 +61,7 @@ export const AttachmentPreview = proxyLazyWebpack(() => {
 
     const channel = Object.freeze(createChannelRecordFromServer({ id: "0", type: ChannelType.GUILD_TEXT }));
 
-    return function AttachmentPreview({ attachment }: AttachmentsComponentProps) {
+    return function AttachmentPreview({ attachment, shouldHideMediaOptions = false }: AttachmentsComponentProps) {
         const message = useMemo(
             () => createPreviewMessage(attachment, channel.id),
             [attachment, channel.id]
@@ -72,7 +72,7 @@ export const AttachmentPreview = proxyLazyWebpack(() => {
                 channel={channel}
                 message={message}
                 canDeleteAttachments={false}
-                shouldHideMediaOptions={false}
+                shouldHideMediaOptions={shouldHideMediaOptions}
                 inlineAttachmentMedia
             />
         );
@@ -147,17 +147,28 @@ export function FilePicker({ onSelectItem }: FilePickerProps) {
 }
 
 const IMAGE_GUTTER = 12;
+const IMAGE_COL_TARGET = 230;
+const VIDEO_COL_TARGET = IMAGE_COL_TARGET * 1.2;
 
-function computeImageLayout(items: { width: number; height: number; }[], containerWidth: number) {
-    // Discord's GIF tab uses absolute positioning for its grid rather than CSS columns
-    // column count and item dimensions were reverse-engineered from the DOM. Items are placed into whichever
-    // column has the smallest accumulated height matching Discord's "shortest-column-first" logic
-    const cols = Math.max(2, Math.round(containerWidth / 230));
+function computeMasonryLayout(
+    items: { width: number; height: number; }[],
+    containerWidth: number,
+    colTarget: number,
+    minCols: number,
+    useFloor = false,
+) {
+    const rawCols = useFloor
+        ? Math.floor(containerWidth / colTarget)
+        : Math.round(containerWidth / colTarget);
+    const cols = Math.max(minCols, rawCols);
     const colWidth = (containerWidth - IMAGE_GUTTER * (cols + 1)) / cols;
     const colTops = Array<number>(cols).fill(IMAGE_GUTTER);
+
     return items.map(item => {
         const col = colTops.indexOf(Math.min(...colTops));
-        const itemHeight = Math.round((item.height / item.width) * colWidth);
+        const mediaWidth = item.width > 0 ? item.width : 16;
+        const mediaHeight = item.height > 0 ? item.height : 9;
+        const itemHeight = Math.round((mediaHeight / mediaWidth) * colWidth);
         const layout = {
             left: IMAGE_GUTTER + col * (colWidth + IMAGE_GUTTER),
             top: colTops[col],
@@ -167,6 +178,14 @@ function computeImageLayout(items: { width: number; height: number; }[], contain
         colTops[col] += itemHeight + IMAGE_GUTTER;
         return layout;
     });
+}
+
+function computeImageLayout(items: { width: number; height: number; }[], containerWidth: number) {
+    return computeMasonryLayout(items, containerWidth, IMAGE_COL_TARGET, 2);
+}
+
+function computeVideoLayout(items: { width: number; height: number; }[], containerWidth: number) {
+    return computeMasonryLayout(items, containerWidth, VIDEO_COL_TARGET, 1, true);
 }
 
 export function ImagePicker({ onSelectItem }: FilePickerProps) {
@@ -261,7 +280,7 @@ export function VideoPicker({ onSelectItem }: FilePickerProps) {
     useEffect(() => { scrollerRef.current?.scrollTo(0, 0); }, [query]);
 
     const layout = useMemo(
-        () => (favs ? computeImageLayout(favs, containerWidth) : []),
+        () => (favs ? computeVideoLayout(favs, containerWidth) : []),
         [favs, containerWidth]
     );
 
@@ -442,6 +461,44 @@ export function ImagePickerItem({ url, src, width, height, layout, onSubmit }: {
     );
 }
 
+function guessVideoContentType(url: string) {
+    const ext = URL.parse(url)?.pathname.split(".").pop()?.toLowerCase();
+    switch (ext) {
+        case "webm": return "video/webm";
+        case "mov": return "video/quicktime";
+        case "mkv": return "video/x-matroska";
+        case "m4v": return "video/x-m4v";
+        default: return "video/mp4";
+    }
+}
+
+function getVideoFilename(url: string) {
+    const pathname = URL.parse(url)?.pathname ?? "";
+    const base = pathname.split("/").pop();
+    if (base && /\.(mp4|webm|mov|m4v|mkv|avi|wmv|flv)$/i.test(base)) return base;
+    return "video.mp4";
+}
+
+function attachmentIdFromUrl(url: string) {
+    let hash = 0;
+    for (let i = 0; i < url.length; i++) hash = ((hash << 5) - hash + url.charCodeAt(i)) | 0;
+    return String(Math.abs(hash));
+}
+
+function createVideoAttachment(url: string, proxyUrl: string, width: number, height: number): FullMessageAttachment {
+    return {
+        id: attachmentIdFromUrl(url),
+        filename: getVideoFilename(url),
+        url,
+        proxy_url: proxyUrl,
+        content_type: guessVideoContentType(url),
+        width: width || 640,
+        height: height || 360,
+        size: 1,
+        spoiler: false,
+    };
+}
+
 export function VideoPickerItem({ url, src, width, height, layout, onSubmit }: { url: string; src: string; width: number; height: number; layout?: { left: number; top: number; width: number; height: number; }; onSubmit: (url: string) => void; }) {
     useEffect(() => {
         SignedUrlsStore.addSigned(url);
@@ -457,30 +514,103 @@ export function VideoPickerItem({ url, src, width, height, layout, onSubmit }: {
     const cleanResolvedSrc = stripExternalVideoMarker(resolvedSrc);
     const isDirectVideo = [cleanResolvedSrc, url].some(isDirectVideoFile);
 
+    const signedUrl = useStateFromStores(
+        [SignedUrlsStore],
+        () => SignedUrlsStore.get(url) ?? url,
+        [url]
+    );
+
+    const signedProxy = useStateFromStores(
+        [SignedUrlsStore],
+        () => SignedUrlsStore.get(src) ?? SignedUrlsStore.get(url) ?? cleanResolvedSrc,
+        [src, url, cleanResolvedSrc]
+    );
+
+    const attachment = useMemo(
+        () => createVideoAttachment(signedUrl, signedProxy, width, height),
+        [signedUrl, signedProxy, width, height]
+    );
+
     const [loaded, setLoaded] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (!isDirectVideo) return;
+
+        const container = containerRef.current;
+        if (!container) return;
+
+        let cleanup: (() => void) | undefined;
+
+        const bindVideo = (video: HTMLVideoElement) => {
+            const markLoaded = () => setLoaded(true);
+            video.addEventListener("loadeddata", markLoaded);
+            if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) markLoaded();
+            cleanup = () => {
+                video.pause();
+                video.removeEventListener("loadeddata", markLoaded);
+            };
+        };
+
+        const existing = container.querySelector("video");
+        if (existing) {
+            bindVideo(existing);
+            return () => cleanup?.();
+        }
+
+        const observer = new MutationObserver(() => {
+            const video = container.querySelector("video");
+            if (!video) return;
+            observer.disconnect();
+            bindVideo(video);
+        });
+
+        observer.observe(container, { childList: true, subtree: true });
+        return () => {
+            observer.disconnect();
+            cleanup?.();
+        };
+    }, [isDirectVideo, attachment]);
 
     return (
         <div
-            className={`${GifPickerClasses.result} ${cl("image-result")}`}
-            role="button"
-            tabIndex={-1}
+            className={`${GifPickerClasses.result} ${cl("image-result", isDirectVideo && "video-result")}`}
+            role={isDirectVideo ? undefined : "button"}
+            tabIndex={isDirectVideo ? undefined : -1}
             style={layout ? { position: "absolute", left: layout.left, top: layout.top, width: layout.width, height: layout.height } : undefined}
-            onClick={() => onSubmit(url)}
+            onClick={isDirectVideo ? undefined : () => onSubmit(url)}
         >
             {!loaded && <div className={cl("image-placeholder")} />}
             {isDirectVideo ? (
-                <video src={cleanResolvedSrc} className={cl("image-gif")} draggable={false} autoPlay muted loop playsInline preload="metadata" onLoadedData={() => setLoaded(true)} />
+                <>
+                    <div ref={containerRef} className={cl("video-attachment")}>
+                        <AttachmentPreview attachment={attachment} shouldHideMediaOptions />
+                    </div>
+                    <button
+                        type="button"
+                        className={cl("video-send-btn")}
+                        aria-label="Insert video link"
+                        onClick={e => {
+                            e.stopPropagation();
+                            onSubmit(url);
+                        }}
+                    >
+                        <SendIcon size="refresh_sm" color="currentColor" />
+                    </button>
+                </>
             ) : (
-                <img src={cleanResolvedSrc} alt="" className={cl("image-gif")} draggable={false} onLoad={() => setLoaded(true)} />
+                <>
+                    <img src={cleanResolvedSrc} alt="" className={cl("image-gif")} draggable={false} onLoad={() => setLoaded(true)} />
+                    <FavoriteButton
+                        className={`${Classes.gifFavoriteButton} ${cl("image-fav-button")}`}
+                        format={FavouriteItemFormat.VIDEO}
+                        url={url}
+                        src={cleanResolvedSrc}
+                        width={width}
+                        height={height}
+                    />
+                </>
             )}
-            <FavoriteButton
-                className={`${Classes.gifFavoriteButton} ${cl("image-fav-button")}`}
-                format={FavouriteItemFormat.VIDEO}
-                url={url}
-                src={cleanResolvedSrc}
-                width={width}
-                height={height}
-            />
         </div>
     );
 }

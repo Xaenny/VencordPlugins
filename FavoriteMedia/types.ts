@@ -73,6 +73,7 @@ export interface FilePickerItemProps {
 
 export interface AttachmentsComponentProps {
     attachment: FullMessageAttachment;
+    shouldHideMediaOptions?: boolean;
 }
 
 export interface EmbedComponent extends Component<{ embed: FullEmbed }> {
