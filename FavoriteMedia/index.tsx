@@ -90,41 +90,23 @@ export default definePlugin({
         },
         {
             // Override the default renderAdjacentContent prop value for all types of embed components (renderImageComponent, renderVideoComponent...)
-            find: "#{intl::MEDIA_MOSAIC_ALT_TEXT_POPOUT_TITLE}",
+            find: "mosaicStyleAlt:E,mediaLayoutType:A",
             replacement: {
                 match: /renderAdjacentContent:(\i)/g,
                 replace: "$&=$self.renderEmbedAccessory"
             }
         },
-        // ATTACHMENTS
-        {
-            find: '["VIDEO","CLIP","AUDIO"]',
-            replacement: [
-                {
-                    // Wrap the attachment component in a custom context to avoid having to drill props
-                    match: /(?<=children:)(\i)=>(\i\(\1\))\}\):(\i\(\))/,
-                    replace: "$1=>$self.renderAttachment($2,arguments[0])}):$self.renderAttachment($3,arguments[0])"
-                },
-                {
-                    // Always add our custom accessory to the attachment's adjacent content
-                    match: "=[];",
-                    replace: "=[$self.renderAttachmentAccessory()];"
-                }
-            ]
-        },
         // EXPRESSION PICKER
         {
-            find: "#{intl::EXPRESSION_PICKER_CATEGORIES_A11Y_LABEL}",
+            find: '"aria-selected":Y===eE.kx.GIF,isActive:Y===eE.kx.GIF,viewType:eE.kx.GIF',
             replacement: [
                 {
-                    // Replace the "GIFs" tab with two custom tabs
-                    match: /\(0,\i\.jsx\)\((\i),[^}]{20,40}?"aria-selected":(\i)[^}]{50,100}?#{intl::EXPRESSION_PICKER_GIF}\)\}\)/,
-                    replace: "$self.renderTabs($1,$2)"
+                    match: /(\i)=(\i)\?\(0,\i\.jsx\)\((\i),\{id:\i\.g9,"aria-controls":\i\.ni,"aria-selected":(\i)===\i\.kx\.GIF,isActive:\4===\i\.kx\.GIF,viewType:\i\.kx\.GIF,children:\i\.intl\.string\(\i\.t\.\i\)\}\):null/,
+                    replace: "$1=$self.renderTabs($3,$4)"
                 },
                 {
-                    // Insert the custom file picker into the expression picker's body
-                    match: /\{onSelectGIF:(\i),[^}]{20,40}\}\):null,(?=(\i)===)/,
-                    replace: "$&$self.renderFilePicker($2,$1),"
+                    match: /Y===\i\.kx\.STICKER/,
+                    replace: "$self.renderFilePicker(Y,a),$&"
                 }
             ]
         },
@@ -138,11 +120,10 @@ export default definePlugin({
         },
         // FAVOURITE BUTTON
         {
-            find: "#{intl::GIF_TOOLTIP_REMOVE_FROM_FAVORITES}",
+            find: "h.default.track(T.HAw.GIF_FAVORITED,{total_num_favorited:d})",
             replacement: {
-                // Intercept the onClick callback to replace the placeholder thumbnail with a valid CDN link
-                match: /\(0,(\i\.\i)\)\((\{[^}].{40,60}?\})\)/,
-                replace: "$self.interceptAddToFavourites($2).then($1)"
+                match: /function (\i)\(e\)\{E\.bW\.updateAsync\("favoriteGifs",t=>\{/,
+                replace: "async function $1(e){e=await $self.interceptAddToFavourites({...e,url:e.url});if(null==e)return;E.bW.updateAsync(\"favoriteGifs\",t=>{"
             }
         }
     ],

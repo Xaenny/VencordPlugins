@@ -107,16 +107,16 @@ export default definePlugin({
             }
         },
         {
-            find: "#{intl::EXPRESSION_PICKER_CATEGORIES_A11Y_LABEL}",
+            find: '"aria-selected":Y===eE.kx.GIF,isActive:Y===eE.kx.GIF,viewType:eE.kx.GIF',
             replacement: [
                 {
-                    match: /\(0,\i\.jsx\)\((\i),[^}]{20,40}?"aria-selected":(\i)[^}]{50,100}?#{intl::EXPRESSION_PICKER_GIF}\)\}\)/,
-                    replace: "$self.renderTabs($1,$2)",
+                    match: /(\i)=(\i)\?\(0,\i\.jsx\)\((\i),\{id:\i\.g9,"aria-controls":\i\.ni,"aria-selected":(\i)===\i\.kx\.GIF,isActive:\4===\i\.kx\.GIF,viewType:\i\.kx\.GIF,children:\i\.intl\.string\(\i\.t\.\i\)\}\):null/,
+                    replace: "$1=$self.renderTabs($3,$4)",
                     predicate: () => !isPluginEnabled("FavoriteMedia")
                 },
                 {
-                    match: /\{onSelectGIF:(\i),[^}]{20,40}\}\):null,(?=(\i)===)/,
-                    replace: "$&$self.renderTextsPicker($2,$1),",
+                    match: /Y===\i\.kx\.STICKER/,
+                    replace: "$self.renderTextsPicker(Y,a),$&",
                     predicate: () => !isPluginEnabled("FavoriteMedia")
                 }
             ]

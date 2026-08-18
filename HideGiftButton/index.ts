@@ -83,36 +83,7 @@ export default definePlugin({
     settings,
     managedStyle: fallbackStyle,
 
-    patches: [
-        {
-            find: "ChannelTextAreaButtons",
-            predicate: () => settings.store.hideGiftButton,
-            replacement: [
-                {
-                    match: /\i\.push\(.{1,200}?,"gift"\)/,
-                    replace: ""
-                },
-                {
-                    match: /(\i)\.push\(.{1,40}?disabled:\i,.{1,40}?,"gift"\)/,
-                    replace: ""
-                }
-            ]
-        },
-        {
-            find: '"sticker")',
-            predicate: () => settings.store.hideGiftButton,
-            replacement: [
-                {
-                    match: /=\i\.gifts?\b/g,
-                    replace: "=null"
-                },
-                {
-                    match: /=\i\.gift\b/g,
-                    replace: "=null"
-                }
-            ]
-        }
-    ],
+    patches: [],
 
     start() {
         dynamicStyle = createAndAppendStyle("VcHideGiftButton", managedStyleRootNode);

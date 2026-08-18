@@ -79,7 +79,7 @@ export default definePlugin({
 
     patches: [
         {
-            find: "#{intl::LOADING_DID_YOU_KNOW}",
+            find: "_loadingText",
             replacement: {
                 match: /(\i)=>\i\.createElement\("video",(\{[^}]+\})\)/,
                 replace: "$1=>$self.renderLoadingLogo($2)"

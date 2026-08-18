@@ -18,8 +18,8 @@ import { SignedUrlsStore } from "./stores";
 import { AttachmentItem, AttachmentsComponentProps, CustomItemFormat, FavoriteButtonProps, FavouriteItemFormat, FilePickerItemProps, FilePickerProps, FullMessageAttachment, ManaSearchBarProps, MessageComponentClass, ScrollerBaseRef } from "./types";
 import { cl, defs, hasPermission, ImageUtils, isDirectVideoFile, markExternalVideoSrc, markStaticImageSrc, sendAttachment, stripExternalVideoMarker, useFavourites, useImageFavourites, useListScroller, useResizeObserver, useVirtualizedMasonry, useVideoFavourites } from "./utils";
 
-const ManaSearchBar = findComponentByCodeLazy<ManaSearchBarProps>("#{intl::SEARCH}),ref");
-const FavoriteButton = findComponentByCodeLazy<FavoriteButtonProps>("#{intl::GIF_TOOLTIP_ADD_TO_FAVORITES}");
+const ManaSearchBar = findComponentByCodeLazy<ManaSearchBarProps>("focusProps:{offset:{top:2,bottom:2,left:4,right:4}}");
+const FavoriteButton = findComponentByCodeLazy<FavoriteButtonProps>("gifSrc:p,url:T,format:m,className:g}=e");
 const SendIcon = findComponentByCodeLazy("M6.6 10.02 14 11.4a.6.6");
 
 const createChannelRecordFromServer = findByCodeLazy(".GUILD_TEXT]", "fromServer)");
@@ -51,7 +51,7 @@ function createPreviewMessage(attachment: FullMessageAttachment, channelId: stri
 
 export const AttachmentPreview = proxyLazyWebpack(() => {
     // findComponentByCodeLazy doesn't work properly with component classes, this must be kept within the lazy scope
-    const MessageComponent = findComponentByCode("this.renderAttachments") as LazyComponentWrapper<MessageComponentClass>;
+    const MessageComponent = findComponentByCode("shouldHideMediaOptions,channel:") as LazyComponentWrapper<MessageComponentClass>;
 
     class MessageAttachmentsComponent extends MessageComponent {
         render(): ReactNode {
