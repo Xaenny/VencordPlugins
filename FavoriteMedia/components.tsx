@@ -6,24 +6,18 @@
 
 import { BaseText } from "@components/BaseText";
 import { Button } from "@components/Button";
-import { LazyComponentWrapper } from "@utils/lazyReact";
-import { Message } from "@vencord/discord-types";
-import { ChannelType } from "@vencord/discord-types/enums";
-import { findByCodeLazy, findComponentByCode, findComponentByCodeLazy, findCssClassesLazy, proxyLazyWebpack } from "@webpack";
+import { findComponentByCodeLazy, findCssClassesLazy } from "@webpack";
 import { ChannelStore, ExpressionPickerStore, ListScrollerThin, lodash, PermissionsBits, PermissionStore, React, useCallback, useEffect, useMemo, useRef, useState, useStateFromStores } from "@webpack/common";
 import { ComponentProps, ComponentType, ReactNode, Ref } from "react";
 
 import { AttachmentContext, EmbedContext, EmbedMosaicContext } from ".";
 import { SignedUrlsStore } from "./stores";
-import { AttachmentItem, AttachmentsComponentProps, CustomItemFormat, FavoriteButtonProps, FavouriteItemFormat, FilePickerItemProps, FilePickerProps, FullMessageAttachment, ManaSearchBarProps, MessageComponentClass, ScrollerBaseRef } from "./types";
+import { AttachmentItem, AttachmentsComponentProps, CustomItemFormat, FavoriteButtonProps, FavouriteItemFormat, FilePickerItemProps, FilePickerProps, FullMessageAttachment, ManaSearchBarProps, ScrollerBaseRef } from "./types";
 import { cl, defs, hasPermission, ImageUtils, isDirectVideoFile, markExternalVideoSrc, markStaticImageSrc, sendAttachment, stripExternalVideoMarker, useFavourites, useImageFavourites, useListScroller, useResizeObserver, useVirtualizedMasonry, useVideoFavourites } from "./utils";
 
 const ManaSearchBar = findComponentByCodeLazy<ManaSearchBarProps>("focusProps:{offset:{top:2,bottom:2,left:4,right:4}}");
 const FavoriteButton = findComponentByCodeLazy<FavoriteButtonProps>("gifSrc:p,url:T,format:m,className:g}=e");
 const SendIcon = findComponentByCodeLazy("M6.6 10.02 14 11.4a.6.6");
-
-const createChannelRecordFromServer = findByCodeLazy(".GUILD_TEXT]", "fromServer)");
-const createMessageRecord = findByCodeLazy(".createFromServer(", ".isBlockedForMessage", "messageReference:");
 
 const Classes = findCssClassesLazy("gifFavoriteButton", "ctaButtonContainer");
 const ScrollerClasses = findCssClassesLazy("thin", "scrollerBase", "fade");
@@ -36,48 +30,48 @@ const ListScroller = ListScrollerThin as ComponentType<
     }
 >;
 
-function createPreviewMessage(attachment: FullMessageAttachment, channelId: string) {
-    const previewMessage = {
-        id: `favourite-anything-preview-${attachment.id}`,
-        attachments: [attachment],
-        channel_id: channelId,
-        content: "",
-        type: 0,
-        timestamp: new Date().toISOString()
-    };
-
-    return createMessageRecord(previewMessage) as Message;
+function formatFileSize(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export const AttachmentPreview = proxyLazyWebpack(() => {
-    // findComponentByCodeLazy doesn't work properly with component classes, this must be kept within the lazy scope
-    const MessageComponent = findComponentByCode("shouldHideMediaOptions,channel:") as LazyComponentWrapper<MessageComponentClass>;
+export function AttachmentPreview({ attachment }: AttachmentsComponentProps) {
+    const url = attachment.url || attachment.proxy_url;
+    const isVideo = attachment.content_type?.startsWith("video/") || isDirectVideoFile(url);
 
-    class MessageAttachmentsComponent extends MessageComponent {
-        render(): ReactNode {
-            return this.renderAttachments(this.props.message);
-        }
+    if (isVideo && url) {
+        return (
+            <div className={cl("simple-preview", "video")}>
+                <video
+                    src={url}
+                    controls
+                    muted
+                    playsInline
+                    preload="metadata"
+                    className={cl("simple-preview-video")}
+                />
+            </div>
+        );
     }
 
-    const channel = Object.freeze(createChannelRecordFromServer({ id: "0", type: ChannelType.GUILD_TEXT }));
-
-    return function AttachmentPreview({ attachment, shouldHideMediaOptions = false }: AttachmentsComponentProps) {
-        const message = useMemo(
-            () => createPreviewMessage(attachment, channel.id),
-            [attachment, channel.id]
-        );
-
-        return (
-            <MessageAttachmentsComponent
-                channel={channel}
-                message={message}
-                canDeleteAttachments={false}
-                shouldHideMediaOptions={shouldHideMediaOptions}
-                inlineAttachmentMedia
-            />
-        );
-    };
-});
+    return (
+        <div className={cl("simple-preview", "file")}>
+            <div className={cl("simple-preview-icon")} aria-hidden="true">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 2 5 5h-5V4z" />
+                </svg>
+            </div>
+            <div className={cl("simple-preview-meta")}>
+                <BaseText className={cl("simple-preview-name")}>{attachment.filename || "file"}</BaseText>
+                <BaseText className={cl("simple-preview-size")}>{formatFileSize(attachment.size ?? 0)}</BaseText>
+                {attachment.title && (
+                    <BaseText className={cl("simple-preview-description")}>{attachment.title}</BaseText>
+                )}
+            </div>
+        </div>
+    );
+}
 
 export function FilePicker({ onSelectItem }: FilePickerProps) {
     const listRef = useRef<ScrollerBaseRef>(null);
@@ -445,44 +439,6 @@ export function ImagePickerItem({ url, src, width, height, layout, onSubmit }: {
     );
 }
 
-function guessVideoContentType(url: string) {
-    const ext = URL.parse(url)?.pathname.split(".").pop()?.toLowerCase();
-    switch (ext) {
-        case "webm": return "video/webm";
-        case "mov": return "video/quicktime";
-        case "mkv": return "video/x-matroska";
-        case "m4v": return "video/x-m4v";
-        default: return "video/mp4";
-    }
-}
-
-function getVideoFilename(url: string) {
-    const pathname = URL.parse(url)?.pathname ?? "";
-    const base = pathname.split("/").pop();
-    if (base && /\.(mp4|webm|mov|m4v|mkv|avi|wmv|flv)$/i.test(base)) return base;
-    return "video.mp4";
-}
-
-function attachmentIdFromUrl(url: string) {
-    let hash = 0;
-    for (let i = 0; i < url.length; i++) hash = ((hash << 5) - hash + url.charCodeAt(i)) | 0;
-    return String(Math.abs(hash));
-}
-
-function createVideoAttachment(url: string, proxyUrl: string, width: number, height: number): FullMessageAttachment {
-    return {
-        id: attachmentIdFromUrl(url),
-        filename: getVideoFilename(url),
-        url,
-        proxy_url: proxyUrl,
-        content_type: guessVideoContentType(url),
-        width: width || 640,
-        height: height || 360,
-        size: 1,
-        spoiler: false,
-    };
-}
-
 export function VideoPickerItem({ url, src, width, height, layout, onSubmit }: { url: string; src: string; width: number; height: number; layout?: { left: number; top: number; width: number; height: number; }; onSubmit: (url: string) => void; }) {
     useEffect(() => {
         SignedUrlsStore.addSigned(url);
@@ -504,66 +460,7 @@ export function VideoPickerItem({ url, src, width, height, layout, onSubmit }: {
         [url]
     );
 
-    const signedProxy = useStateFromStores(
-        [SignedUrlsStore],
-        () => SignedUrlsStore.get(src) ?? SignedUrlsStore.get(url) ?? cleanResolvedSrc,
-        [src, url, cleanResolvedSrc]
-    );
-
-    const attachment = useMemo(
-        () => createVideoAttachment(
-            signedUrl,
-            signedProxy,
-            Math.round(layout?.width ?? width),
-            Math.round(layout?.height ?? height),
-        ),
-        [signedUrl, signedProxy, layout?.width, layout?.height, width, height]
-    );
-
     const [loaded, setLoaded] = useState(false);
-    const containerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!isDirectVideo) return;
-
-        const container = containerRef.current;
-        if (!container) return;
-
-        let cleanup: (() => void) | undefined;
-
-        const bindVideo = (video: HTMLVideoElement) => {
-            const markLoaded = () => setLoaded(true);
-            video.addEventListener("loadeddata", markLoaded);
-            if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) markLoaded();
-            cleanup = () => {
-                video.pause();
-                video.removeEventListener("loadeddata", markLoaded);
-            };
-        };
-
-        const existing = container.querySelector("video");
-        if (existing) {
-            bindVideo(existing);
-            return () => cleanup?.();
-        }
-
-        const observer = new MutationObserver(() => {
-            const video = container.querySelector("video");
-            if (!video) return;
-            observer.disconnect();
-            bindVideo(video);
-        });
-
-        observer.observe(container, { childList: true, subtree: true });
-
-        const fallbackLoaded = window.setTimeout(() => setLoaded(true), 800);
-
-        return () => {
-            observer.disconnect();
-            cleanup?.();
-            window.clearTimeout(fallbackLoaded);
-        };
-    }, [isDirectVideo, attachment]);
 
     return (
         <div
@@ -576,9 +473,15 @@ export function VideoPickerItem({ url, src, width, height, layout, onSubmit }: {
             {!loaded && <div className={cl("image-placeholder")} />}
             {isDirectVideo ? (
                 <>
-                    <div ref={containerRef} className={cl("video-attachment")}>
-                        <AttachmentPreview attachment={attachment} shouldHideMediaOptions />
-                    </div>
+                    <video
+                        src={signedUrl}
+                        controls
+                        muted
+                        playsInline
+                        preload="metadata"
+                        className={cl("simple-preview-video")}
+                        onLoadedData={() => setLoaded(true)}
+                    />
                     <button
                         type="button"
                         className={cl("video-send-btn")}

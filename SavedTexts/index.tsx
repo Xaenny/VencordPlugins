@@ -110,13 +110,13 @@ export default definePlugin({
             find: '"aria-selected":Y===eE.kx.GIF,isActive:Y===eE.kx.GIF,viewType:eE.kx.GIF',
             replacement: [
                 {
-                    match: /(\i)=(\i)\?\(0,\i\.jsx\)\((\i),\{id:\i\.g9,"aria-controls":\i\.ni,"aria-selected":(\i)===\i\.kx\.GIF,isActive:\4===\i\.kx\.GIF,viewType:\i\.kx\.GIF,children:\i\.intl\.string\(\i\.t\.\i\)\}\):null/,
+                    match: /(\i)=(\i)\?\(0,\i\.jsx\)\((\i),\{id:\i\.g9,"aria-controls":\i\.ni,"aria-selected":(\i)===\i\.kx\.GIF,isActive:\4===\i\.kx\.GIF,viewType:\i\.kx\.GIF,children:\i\.intl\.string\(\i\.t(?:\.\i|\[".+?"\])\)\}\):null/,
                     replace: "$1=$self.renderTabs($3,$4)",
                     predicate: () => !isPluginEnabled("FavoriteMedia")
                 },
                 {
-                    match: /Y===\i\.kx\.STICKER/,
-                    replace: "$self.renderTextsPicker(Y,a),$&",
+                    match: /(\i)===\i\.kx\.STICKER&&(\i)\?\(0,\i\.jsx\)\(\i,/,
+                    replace: "$self.renderTextsPicker($1,a),$&",
                     predicate: () => !isPluginEnabled("FavoriteMedia")
                 }
             ]
