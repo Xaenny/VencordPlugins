@@ -98,7 +98,18 @@ Removes the Nitro **gift button** from the chat input bar.
            └── HideGiftButton/
    ```
 
-2. From your Vencord folder, build and inject:
+   Vencord builds from `src/userplugins`, so the folders have to be **copied** in — junctions and
+   symlinks don't work, because esbuild resolves them to their real path outside the Vencord tree
+   and the `@api`/`@utils`/`@webpack` aliases stop resolving.
+
+   To copy them in (and avoid the repo and the copies drifting apart), run from this repo:
+   ```powershell
+   .\scripts\sync-to-vencord.ps1 -Vencord C:\path\to\Vencord -Build
+   ```
+   It treats this repo as the source of truth and backs up any destination folder that differs
+   before replacing it, so edits made in the wrong place are never lost silently.
+
+2. Or, from your Vencord folder, build and inject by hand:
    ```powershell
    pnpm build
    pnpm inject
