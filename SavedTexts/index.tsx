@@ -119,7 +119,7 @@ export default definePlugin({
                     predicate: () => !isPluginEnabled("FavoriteMedia")
                 },
                 {
-                    match: /(\i)===\i\.\i\.STICKER&&(\i)\?\(0,\i\.jsx\)\(\i,/,
+                    match: /(\i)===\i\.\i\.GIF&&\i\?\(0,\i\.jsx\)\((?:\i\.)?\i,\{onSelectGIF:(\i),/,
                     replace: "$self.renderTextsPicker($1,$2),$&",
                     predicate: () => !isPluginEnabled("FavoriteMedia")
                 }
