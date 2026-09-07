@@ -11,7 +11,9 @@ import "./style.css";
 import { isPluginEnabled } from "@api/PluginManager";
 import { ChatBarProps } from "@api/ChatButtons";
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
+import ErrorBoundary from "@components/ErrorBoundary";
 import { insertTextIntoChatInputBox } from "@utils/discord";
+import { Logger } from "@utils/Logger";
 import definePlugin, { IconComponent } from "@utils/types";
 import { Message } from "@vencord/discord-types";
 import { findCssClassesLazy } from "@webpack";
@@ -21,6 +23,8 @@ import { ComponentType } from "react";
 import { ExpressionPickerView } from "../FavoriteMedia/types";
 import { settings } from "./settings";
 import { openEditTextModal, TextPicker } from "./TextPicker";
+
+const logger = new Logger("SavedTexts");
 
 const ButtonWrapperClasses = findCssClassesLazy("button", "buttonWrapper", "notificationDot");
 const ChannelTextAreaClasses = findCssClassesLazy("buttonContainer", "channelTextArea", "button");
@@ -34,7 +38,7 @@ export const SavedTextsIcon: IconComponent = ({ height = 20, width = 20, classNa
     </svg>
 );
 
-function PickerButton({ onClick, children }: { onClick: () => void; children: ReactNode; }) {
+const PickerButton = ErrorBoundary.wrap(function PickerButton({ onClick, children }: { onClick: () => void; children: ReactNode; }) {
     return (
         <div className={`expression-picker-chat-input-button ${ChannelTextAreaClasses?.buttonContainer ?? ""}`}>
             <div
@@ -50,7 +54,7 @@ function PickerButton({ onClick, children }: { onClick: () => void; children: Re
             </div>
         </div>
     );
-}
+}, { noop: true });
 
 function getMessageContent(message: Message) {
     return message.content
@@ -107,16 +111,16 @@ export default definePlugin({
             }
         },
         {
-            find: '"aria-selected":Y===eE.kx.GIF,isActive:Y===eE.kx.GIF,viewType:eE.kx.GIF',
+            find: /"aria-selected":[A-Za-z_$][\w$]*===[A-Za-z_$][\w$]*\.[A-Za-z_$][\w$]*\.GIF,isActive:/,
             replacement: [
                 {
-                    match: /(\i)=(\i)\?\(0,\i\.jsx\)\((\i),\{id:\i\.g9,"aria-controls":\i\.ni,"aria-selected":(\i)===\i\.kx\.GIF,isActive:\4===\i\.kx\.GIF,viewType:\i\.kx\.GIF,children:\i\.intl\.string\(\i\.t(?:\.\i|\[".+?"\])\)\}\):null/,
+                    match: /(\i)=(\i)\?\(0,\i\.jsx\)\((\i),\{id:\i\.\i,"aria-controls":\i\.\i,"aria-selected":(\i)===\i\.\i\.GIF,isActive:\4===\i\.\i\.GIF,viewType:\i\.\i\.GIF,children:\i\.intl\.string\(\i\.t(?:\.\i|\[".+?"\])\)\}\):null/,
                     replace: "$1=$self.renderTabs($3,$4)",
                     predicate: () => !isPluginEnabled("FavoriteMedia")
                 },
                 {
-                    match: /(\i)===\i\.kx\.STICKER&&(\i)\?\(0,\i\.jsx\)\(\i,/,
-                    replace: "$self.renderTextsPicker($1,a),$&",
+                    match: /(\i)===\i\.\i\.STICKER&&(\i)\?\(0,\i\.jsx\)\(\i,/,
+                    replace: "$self.renderTextsPicker($1,$2),$&",
                     predicate: () => !isPluginEnabled("FavoriteMedia")
                 }
             ]
@@ -166,6 +170,13 @@ export default definePlugin({
     },
 
     injectTextsButton(buttons: ReactNode[], props: ChatBarProps) {
+        try {
+            this.injectTextsButtonInner(buttons, props);
+        } catch (err) {
+            logger.error("Failed to inject the texts button", err);
+        }
+    },
+    injectTextsButtonInner(buttons: ReactNode[], props: ChatBarProps) {
         if (props?.disabled || !isChatBarTarget(props)) return;
 
         let insertIdx = buttons.length;
