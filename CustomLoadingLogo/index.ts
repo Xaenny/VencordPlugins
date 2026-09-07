@@ -115,7 +115,9 @@ export default definePlugin({
             }
         });
 
-        observer.observe(document.documentElement, { childList: true, subtree: true });
+        // At StartAt.Init there is no <html> yet, so documentElement is null and observe() throws.
+        // Document is itself a Node, so it works as a target either way.
+        observer.observe(document.documentElement ?? document, { childList: true, subtree: true });
 
         settingsListener = () => replaceLoadingLogo();
         SettingsStore.addChangeListener("plugins.CustomLoadingLogo", settingsListener);

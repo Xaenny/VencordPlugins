@@ -14,7 +14,7 @@ import { findCssClassesLazy, proxyLazyWebpack } from "@webpack";
 import { ExpressionPickerStore, React } from "@webpack/common";
 import { ComponentType, ReactNode } from "react";
 
-import { AttachmentAccessory, EmbedAccessory, FilePicker, ImagePicker, VideoPicker } from "./components";
+import { AttachmentAccessory, EmbedAccessory, FilePicker, ImagePicker, lookupSelfCheck, VideoPicker } from "./components";
 import { TextPicker } from "../SavedTexts/TextPicker";
 import { settings } from "./settings";
 import { SignedUrlsStore } from "./stores";
@@ -108,7 +108,10 @@ export default definePlugin({
                     replace: "$1=$self.renderTabs($3,$4)"
                 },
                 {
-                    match: /(\i)===\i\.\i\.STICKER&&(\i)\?\(0,\i\.jsx\)\(\i,/,
+                    // Anchored on the GIF branch because it carries both the active view and the
+                    // onSelectGIF callback our Files tab needs - the STICKER branch's second operand
+                    // is just a boolean gate
+                    match: /(\i)===\i\.\i\.GIF&&\i\?\(0,\i\.jsx\)\((?:\i\.)?\i,\{onSelectGIF:(\i),/,
                     replace: "$self.renderFilePicker($1,$2),$&"
                 }
             ]
@@ -130,6 +133,15 @@ export default definePlugin({
             }
         }
     ],
+    start() {
+        // Discord renames its minified internals on every client update. Log what this build could
+        // still find, so a stale lookup shows up here instead of as a mystery crash.
+        const found = lookupSelfCheck();
+        const missing = Object.entries(found).filter(([, ok]) => !ok).map(([name]) => name);
+
+        if (missing.length) logger.warn("Could not find in this Discord build:", missing.join(", "), "- those parts will be hidden");
+        else logger.info("All Discord component lookups resolved");
+    },
     renderTabs(Tab: ComponentType<ExpressionPickerTabProps>, activeView: ExpressionPickerView) {
         return (
             <>

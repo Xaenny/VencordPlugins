@@ -26,10 +26,13 @@ const getManaSearchBar = lazyResolve("the search bar", () => findComponentSafely
 ]));
 
 const getFavoriteButton = lazyResolve("the favourite button", () => findComponentSafely<FavoriteButtonProps>("the favourite button", [
-    ["gifSrc:", "url:", "format:", "className:", "}=e"],
+    // Its two tooltip strings - intl keys survive minification entirely, so this is the sturdiest anchor
     ["#{intl::GIF_TOOLTIP_ADD_TO_FAVORITES}"],
     ["#{intl::GIF_TOOLTIP_REMOVE_FROM_FAVORITES}"],
-    ["gifSrc:", "format:", "className:"]
+    // The action it dispatches, plus a prop name. Both survive minification
+    ["gifSrc:", "FAVORITE_GIF"],
+    // Shape of its props destructuring, without depending on the minified local names
+    ["gifSrc:", "url:", "format:", "className:", "}=e"]
 ]));
 
 const getSendIcon = lazyResolve("the send icon", () => findComponentSafely("the send icon", [
@@ -669,3 +672,12 @@ export const ImagePicker = ErrorBoundary.wrap(ImagePickerInner, { noop: true });
 export const VideoPicker = ErrorBoundary.wrap(VideoPickerInner, { noop: true });
 export const EmbedAccessory = ErrorBoundary.wrap(EmbedAccessoryInner, { noop: true });
 export const AttachmentAccessory = ErrorBoundary.wrap(AttachmentAccessoryInner, { noop: true });
+
+/** Which Discord components this build managed to find - logged once on start. */
+export function lookupSelfCheck() {
+    return {
+        favouriteButton: getFavoriteButton() != null,
+        searchBar: getManaSearchBar() != null,
+        sendIcon: getSendIcon() != null
+    };
+}
