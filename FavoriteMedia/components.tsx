@@ -6,22 +6,83 @@
 
 import { BaseText } from "@components/BaseText";
 import { Button } from "@components/Button";
-import { findComponentByCodeLazy, findCssClassesLazy } from "@webpack";
+import ErrorBoundary from "@components/ErrorBoundary";
+import { findCssClassesLazy } from "@webpack";
 import { ChannelStore, ExpressionPickerStore, ListScrollerThin, lodash, PermissionsBits, PermissionStore, React, useCallback, useEffect, useMemo, useRef, useState, useStateFromStores } from "@webpack/common";
 import { ComponentProps, ComponentType, ReactNode, Ref } from "react";
 
 import { AttachmentContext, EmbedContext, EmbedMosaicContext } from ".";
 import { SignedUrlsStore } from "./stores";
 import { AttachmentItem, AttachmentsComponentProps, CustomItemFormat, FavoriteButtonProps, FavouriteItemFormat, FilePickerItemProps, FilePickerProps, FullMessageAttachment, ManaSearchBarProps, ScrollerBaseRef } from "./types";
-import { cl, defs, hasPermission, ImageUtils, isDirectVideoFile, markExternalVideoSrc, markStaticImageSrc, sendAttachment, stripExternalVideoMarker, useFavourites, useImageFavourites, useListScroller, useResizeObserver, useVirtualizedMasonry, useVideoFavourites } from "./utils";
+import { cl, defs, findComponentSafely, hasPermission, isAnimatedMedia, isDirectVideoFile, lazyResolve, markExternalVideoSrc, markStaticImageSrc, sendAttachment, stripExternalVideoMarker, useFavourites, useImageFavourites, useListScroller, useResizeObserver, useVirtualizedMasonry, useVideoFavourites } from "./utils";
 
-const ManaSearchBar = findComponentByCodeLazy<ManaSearchBarProps>("focusProps:{offset:{top:2,bottom:2,left:4,right:4}}");
-const FavoriteButton = findComponentByCodeLazy<FavoriteButtonProps>("gifSrc:p,url:T,format:m,className:g}=e");
-const SendIcon = findComponentByCodeLazy("M6.6 10.02 14 11.4a.6.6");
+// Each entry is a list of code fragments that must all appear in the component. They are tried in
+// order, so a build that renamed one set of minified locals can still be matched by a later,
+// less specific candidate. If nothing matches we render a fallback instead of throwing.
+const getManaSearchBar = lazyResolve("the search bar", () => findComponentSafely<ManaSearchBarProps>("the search bar", [
+    ["focusProps:{offset:{top:2,bottom:2,left:4,right:4}}"],
+    ["#{intl::SEARCH}),ref"],
+    ["onClear:", "query:", "inputProps:"]
+]));
+
+const getFavoriteButton = lazyResolve("the favourite button", () => findComponentSafely<FavoriteButtonProps>("the favourite button", [
+    ["gifSrc:", "url:", "format:", "className:", "}=e"],
+    ["#{intl::GIF_TOOLTIP_ADD_TO_FAVORITES}"],
+    ["#{intl::GIF_TOOLTIP_REMOVE_FROM_FAVORITES}"],
+    ["gifSrc:", "format:", "className:"]
+]));
+
+const getSendIcon = lazyResolve("the send icon", () => findComponentSafely("the send icon", [
+    ["M6.6 10.02 14 11.4a.6.6"]
+]));
 
 const Classes = findCssClassesLazy("gifFavoriteButton", "ctaButtonContainer");
 const ScrollerClasses = findCssClassesLazy("thin", "scrollerBase", "fade");
 const GifPickerClasses = findCssClassesLazy("result", "endContainer");
+
+/** findCssClassesLazy returns a proxy that throws when the class module is gone - never let that escape. */
+function css(classes: unknown, name: string): string {
+    try {
+        return (classes as Record<string, string> | undefined)?.[name] ?? "";
+    } catch {
+        return "";
+    }
+}
+
+/** Discord's star button, or nothing at all if this build no longer exposes it. */
+const FavoriteButton = ErrorBoundary.wrap(function FavoriteButton(props: FavoriteButtonProps) {
+    const Component = getFavoriteButton();
+    if (!Component) return null;
+
+    return <Component {...props} />;
+}, { noop: true });
+
+function ManaSearchBar(props: ManaSearchBarProps) {
+    const Component = getManaSearchBar();
+    if (Component) return <Component {...props} />;
+
+    return (
+        <input
+            className={cl("fallback-search")}
+            type="text"
+            autoFocus={props.autoFocus}
+            placeholder={props.placeholder}
+            value={props.query ?? ""}
+            onChange={e => (props.onChange as ((value: string) => void) | undefined)?.(e.currentTarget.value)}
+        />
+    );
+}
+
+function SendIcon(props: { size?: string; color?: string; }) {
+    const Component = getSendIcon();
+    if (Component) return <Component {...props} />;
+
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="currentColor" d="M2.3 21.4 22 12 2.3 2.6 2 9.5l14 2.5-14 2.5z" />
+        </svg>
+    );
+}
 
 const ListScroller = ListScrollerThin as ComponentType<
     Omit<ComponentProps<typeof ListScrollerThin>, "rowHeight" | "ref"> & {
@@ -73,7 +134,7 @@ export function AttachmentPreview({ attachment }: AttachmentsComponentProps) {
     );
 }
 
-export function FilePicker({ onSelectItem }: FilePickerProps) {
+function FilePickerInner({ onSelectItem }: FilePickerProps) {
     const listRef = useRef<ScrollerBaseRef>(null);
 
     const { channelId, query } = ExpressionPickerStore.useExpressionPickerStore(store => ({
@@ -166,7 +227,7 @@ function computeImageLayout(items: { width: number; height: number; }[], contain
     });
 }
 
-export function ImagePicker({ onSelectItem }: FilePickerProps) {
+function ImagePickerInner({ onSelectItem }: FilePickerProps) {
     const { query } = ExpressionPickerStore.useExpressionPickerStore(store => ({
         query: store.searchQuery
     }));
@@ -211,7 +272,7 @@ export function ImagePicker({ onSelectItem }: FilePickerProps) {
             </div>
             {count > 0 ? (
                 <div style={{ flex: "1", minHeight: "0", display: "flex" }}>
-                    <div ref={scrollerRef} className={`${ScrollerClasses.thin} ${ScrollerClasses.scrollerBase} ${ScrollerClasses.fade} ${cl("image-results")}`}>
+                    <div ref={scrollerRef} className={`${css(ScrollerClasses, "thin")} ${css(ScrollerClasses, "scrollerBase")} ${css(ScrollerClasses, "fade")} ${cl("image-results")}`}>
                         <div className={cl("image-content")} style={{ height: totalHeight }}>
                             <div className={cl("image-inner")}>
                                 {visibleIndices.map(i => (
@@ -227,7 +288,7 @@ export function ImagePicker({ onSelectItem }: FilePickerProps) {
                                 ))}
                             </div>
                             <div style={{ position: "absolute", left: 0, width: "100%", top: itemsBottom, height: IMAGE_END_CONTAINER_HEIGHT + IMAGE_GUTTER }}>
-                                <div className={GifPickerClasses.endContainer} style={{ position: "sticky", left: IMAGE_GUTTER, width: `calc(100% - ${IMAGE_GUTTER}px)`, top: 0, height: IMAGE_END_CONTAINER_HEIGHT }} />
+                                <div className={css(GifPickerClasses, "endContainer")} style={{ position: "sticky", left: IMAGE_GUTTER, width: `calc(100% - ${IMAGE_GUTTER}px)`, top: 0, height: IMAGE_END_CONTAINER_HEIGHT }} />
                             </div>
                         </div>
                     </div>
@@ -241,7 +302,7 @@ export function ImagePicker({ onSelectItem }: FilePickerProps) {
     );
 }
 
-export function VideoPicker({ onSelectItem }: FilePickerProps) {
+function VideoPickerInner({ onSelectItem }: FilePickerProps) {
     const { query } = ExpressionPickerStore.useExpressionPickerStore(store => ({
         query: store.searchQuery
     }));
@@ -286,7 +347,7 @@ export function VideoPicker({ onSelectItem }: FilePickerProps) {
             </div>
             {count > 0 ? (
                 <div style={{ flex: "1", minHeight: "0", display: "flex" }}>
-                    <div ref={scrollerRef} className={`${ScrollerClasses.thin} ${ScrollerClasses.scrollerBase} ${ScrollerClasses.fade} ${cl("image-results")}`}>
+                    <div ref={scrollerRef} className={`${css(ScrollerClasses, "thin")} ${css(ScrollerClasses, "scrollerBase")} ${css(ScrollerClasses, "fade")} ${cl("image-results")}`}>
                         <div className={cl("image-content")} style={{ height: totalHeight }}>
                             <div className={cl("image-inner")}>
                                 {visibleIndices.map(i => (
@@ -302,7 +363,7 @@ export function VideoPicker({ onSelectItem }: FilePickerProps) {
                                 ))}
                             </div>
                             <div style={{ position: "absolute", left: 0, width: "100%", top: itemsBottom, height: VIDEO_END_CONTAINER_HEIGHT + IMAGE_GUTTER }}>
-                                <div className={GifPickerClasses.endContainer} style={{ position: "sticky", left: IMAGE_GUTTER, width: `calc(100% - ${IMAGE_GUTTER}px)`, top: 0, height: VIDEO_END_CONTAINER_HEIGHT }} />
+                                <div className={css(GifPickerClasses, "endContainer")} style={{ position: "sticky", left: IMAGE_GUTTER, width: `calc(100% - ${IMAGE_GUTTER}px)`, top: 0, height: VIDEO_END_CONTAINER_HEIGHT }} />
                             </div>
                         </div>
                     </div>
@@ -419,7 +480,7 @@ export function ImagePickerItem({ url, src, width, height, layout, onSubmit }: {
 
     return (
         <div
-            className={`${GifPickerClasses.result} ${cl("image-result")}`}
+            className={`${css(GifPickerClasses, "result")} ${cl("image-result")}`}
             role="button"
             tabIndex={-1}
             style={layout ? { position: "absolute", left: layout.left, top: layout.top, width: layout.width, height: layout.height } : undefined}
@@ -428,7 +489,7 @@ export function ImagePickerItem({ url, src, width, height, layout, onSubmit }: {
             {!loaded && <div className={cl("image-placeholder")} />}
             <img src={resolvedSrc} alt="" className={cl("image-gif")} draggable={false} onLoad={() => setLoaded(true)} />
             <FavoriteButton
-                className={`${Classes.gifFavoriteButton} ${cl("image-fav-button")}`}
+                className={`${css(Classes, "gifFavoriteButton")} ${cl("image-fav-button")}`}
                 format={FavouriteItemFormat.IMAGE}
                 url={url}
                 src={resolvedSrc}
@@ -464,7 +525,7 @@ export function VideoPickerItem({ url, src, width, height, layout, onSubmit }: {
 
     return (
         <div
-            className={`${GifPickerClasses.result} ${cl("image-result", isDirectVideo && "video-result")}`}
+            className={`${css(GifPickerClasses, "result")} ${cl("image-result", isDirectVideo && "video-result")}`}
             role={isDirectVideo ? undefined : "button"}
             tabIndex={isDirectVideo ? undefined : -1}
             style={layout ? { position: "absolute", left: layout.left, top: layout.top, width: layout.width, height: layout.height } : undefined}
@@ -498,7 +559,7 @@ export function VideoPickerItem({ url, src, width, height, layout, onSubmit }: {
                 <>
                     <img src={cleanResolvedSrc} alt="" className={cl("image-gif")} draggable={false} onLoad={() => setLoaded(true)} />
                     <FavoriteButton
-                        className={`${Classes.gifFavoriteButton} ${cl("image-fav-button")}`}
+                        className={`${css(Classes, "gifFavoriteButton")} ${cl("image-fav-button")}`}
                         format={FavouriteItemFormat.VIDEO}
                         url={url}
                         src={cleanResolvedSrc}
@@ -511,7 +572,7 @@ export function VideoPickerItem({ url, src, width, height, layout, onSubmit }: {
     );
 }
 
-export function EmbedAccessory() {
+function EmbedAccessoryInner() {
     const embed = React.useContext(EmbedContext);
     const mosaicIndex = React.useContext(EmbedMosaicContext);
 
@@ -546,7 +607,7 @@ export function EmbedAccessory() {
         const src = img.proxyURL ?? img.url;
 
         // Do not render the custom embed accessory if the original image already has a gif accessory
-        const isAnimated = ImageUtils.isAnimated({ ...img, original: img.url, src, animated: false });
+        const isAnimated = isAnimatedMedia({ ...img, original: img.url, src, animated: false });
         if (isAnimated) return null;
 
         return { ...img, format: FavouriteItemFormat.IMAGE, src: markStaticImageSrc(src) };
@@ -555,7 +616,7 @@ export function EmbedAccessory() {
     return (
         props && (
             <div className={cl("image-accessory")}>
-                <FavoriteButton {...props} className={Classes.gifFavoriteButton} />
+                <FavoriteButton {...props} className={css(Classes, "gifFavoriteButton")} />
             </div>
         )
     );
@@ -567,7 +628,7 @@ const visualMediaFormats: Partial<Record<AttachmentItem["type"], FavouriteItemFo
     CLIP: FavouriteItemFormat.VIDEO
 });
 
-export function AttachmentAccessory() {
+function AttachmentAccessoryInner() {
     const attachment = React.useContext(AttachmentContext);
 
     const props: FavoriteButtonProps | null = useMemo(() => {
@@ -575,7 +636,7 @@ export function AttachmentAccessory() {
         const { originalItem, type, downloadUrl, width = 600, height = 400, srcIsAnimated } = attachment;
 
         // Do not render the custom accessory if the original attachment component already has a gif accessory
-        const isAnimated = ImageUtils.isAnimated({
+        const isAnimated = isAnimatedMedia({
             original: originalItem.url,
             src: originalItem.proxy_url,
             animated: false,
@@ -602,3 +663,9 @@ export function AttachmentAccessory() {
 
     return props && <FavoriteButton {...props} className={cl("attachment-accessory")} />;
 }
+
+export const FilePicker = ErrorBoundary.wrap(FilePickerInner, { noop: true });
+export const ImagePicker = ErrorBoundary.wrap(ImagePickerInner, { noop: true });
+export const VideoPicker = ErrorBoundary.wrap(VideoPickerInner, { noop: true });
+export const EmbedAccessory = ErrorBoundary.wrap(EmbedAccessoryInner, { noop: true });
+export const AttachmentAccessory = ErrorBoundary.wrap(AttachmentAccessoryInner, { noop: true });

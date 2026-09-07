@@ -6,12 +6,13 @@
 
 import "./style.css";
 
+import ErrorBoundary from "@components/ErrorBoundary";
 import { DeleteIcon, PencilIcon } from "@components/Icons";
-import { findComponentByCodeLazy, findCssClassesLazy } from "@webpack";
+import { findCssClassesLazy } from "@webpack";
 import { ExpressionPickerStore, Forms, Modal, openModal, TextArea, TextInput, useCallback, useEffect, useMemo, useRef, useState } from "@webpack/common";
 import { RenderModalProps } from "@vencord/discord-types";
 
-import { useResizeObserver, useVirtualizedMasonry } from "../FavoriteMedia/utils";
+import { findComponentSafely, lazyResolve, useResizeObserver, useVirtualizedMasonry } from "../FavoriteMedia/utils";
 import { settings } from "./settings";
 import { addSavedText, getPasteCount, getSavedTexts, incrementPasteCount, makeDefaultName, removeSavedText, SavedText, setPasteCount, updateSavedText } from "./storage";
 
@@ -23,9 +24,40 @@ interface ManaSearchBarProps {
     onClear?: () => void;
 }
 
-const ManaSearchBar = findComponentByCodeLazy<ManaSearchBarProps>("#{intl::SEARCH}),ref");
+// Resolved lazily and defensively: a stale lookup must not throw during render (that crashes Discord)
+const getManaSearchBar = lazyResolve("the search bar", () => findComponentSafely<ManaSearchBarProps>("the search bar", [
+    ["focusProps:{offset:{top:2,bottom:2,left:4,right:4}}"],
+    ["#{intl::SEARCH}),ref"],
+    ["onClear:", "query:", "inputProps:"]
+]));
+
 const ScrollerClasses = findCssClassesLazy("thin", "scrollerBase", "fade");
 const GifPickerClasses = findCssClassesLazy("endContainer");
+
+/** findCssClassesLazy returns a proxy that throws when the class module is gone - never let that escape. */
+function css(classes: unknown, name: string): string {
+    try {
+        return (classes as Record<string, string> | undefined)?.[name] ?? "";
+    } catch {
+        return "";
+    }
+}
+
+function ManaSearchBar(props: ManaSearchBarProps) {
+    const Component = getManaSearchBar();
+    if (Component) return <Component {...props} />;
+
+    return (
+        <input
+            className="vc-saved-texts-fallback-search"
+            type="text"
+            autoFocus={props.autoFocus}
+            placeholder={props.placeholder}
+            value={props.query ?? ""}
+            onChange={e => props.onChange?.(e.currentTarget.value)}
+        />
+    );
+}
 
 const TEXT_GUTTER = 12;
 const TEXT_END_CONTAINER_HEIGHT = 80;
@@ -284,7 +316,7 @@ function TextCard({
     );
 }
 
-export function TextPicker({ onSelectItem }: { onSelectItem: (text: string) => void; }) {
+function TextPickerInner({ onSelectItem }: { onSelectItem: (text: string) => void; }) {
     const scrollerRef = useRef<HTMLDivElement>(null);
     const [items, setItems] = useState<SavedText[]>([]);
     const [loading, setLoading] = useState(true);
@@ -396,7 +428,7 @@ export function TextPicker({ onSelectItem }: { onSelectItem: (text: string) => v
                 <div style={{ flex: "1", minHeight: "0", display: "flex" }}>
                     <div
                         ref={scrollerRef}
-                        className={`${ScrollerClasses.thin} ${ScrollerClasses.scrollerBase} ${ScrollerClasses.fade} vc-saved-texts-grid`}
+                        className={`${css(ScrollerClasses, "thin")} ${css(ScrollerClasses, "scrollerBase")} ${css(ScrollerClasses, "fade")} vc-saved-texts-grid`}
                     >
                         <div className="vc-saved-texts-grid-content" style={{ height: totalHeight }}>
                             <div className="vc-saved-texts-grid-inner">
@@ -425,7 +457,7 @@ export function TextPicker({ onSelectItem }: { onSelectItem: (text: string) => v
                                 }}
                             >
                                 <div
-                                    className={GifPickerClasses.endContainer}
+                                    className={css(GifPickerClasses, "endContainer")}
                                     style={{
                                         position: "sticky",
                                         left: TEXT_GUTTER,
@@ -442,3 +474,5 @@ export function TextPicker({ onSelectItem }: { onSelectItem: (text: string) => v
         </div>
     );
 }
+
+export const TextPicker = ErrorBoundary.wrap(TextPickerInner, { noop: true });

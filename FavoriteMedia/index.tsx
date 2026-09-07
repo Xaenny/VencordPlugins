@@ -5,6 +5,7 @@
  */
 
 import { ChatBarProps } from "@api/ChatButtons";
+import ErrorBoundary from "@components/ErrorBoundary";
 import { FolderIcon, ImageIcon } from "@components/Icons";
 import { Devs } from "@utils/constants";
 import { getIntlMessage, insertTextIntoChatInputBox } from "@utils/discord";
@@ -19,7 +20,7 @@ import { settings } from "./settings";
 import { SignedUrlsStore } from "./stores";
 import managedStyle from "./style.css?managed";
 import { AttachmentItem, EmbedComponent, ExpressionPickerTabProps, ExpressionPickerView, FavouriteItem, FavouriteItemFormat, FullEmbed } from "./types";
-import { getThumbnailUrl, isMediaItem } from "./utils";
+import { getThumbnailUrl, isMediaItem, logger } from "./utils";
 
 export const EmbedContext = proxyLazyWebpack(() => React.createContext<null | FullEmbed>(null));
 export const EmbedMosaicContext = proxyLazyWebpack(() => React.createContext<null | number>(null));
@@ -28,7 +29,7 @@ export const AttachmentContext = proxyLazyWebpack(() => React.createContext<null
 const ButtonWrapperClasses = findCssClassesLazy("button", "buttonWrapper", "notificationDot");
 const ChannelTextAreaClasses = findCssClassesLazy("buttonContainer", "channelTextArea", "button");
 
-function PickerButton({ onClick, children }: { onClick: () => void; children: ReactNode; }) {
+const PickerButton = ErrorBoundary.wrap(function PickerButton({ onClick, children }: { onClick: () => void; children: ReactNode; }) {
     return (
         <div className={`expression-picker-chat-input-button ${ChannelTextAreaClasses?.buttonContainer ?? ""}`}>
             <div
@@ -44,7 +45,7 @@ function PickerButton({ onClick, children }: { onClick: () => void; children: Re
             </div>
         </div>
     );
-}
+}, { noop: true });
 
 function VideoIcon({ height = 20, width = 20, className }: { height?: number; width?: number; className?: string; }) {
     return (
@@ -77,9 +78,11 @@ export default definePlugin({
             find: "this.renderInlineMediaEmbed",
             replacement: [
                 {
-                    // Wrap the embed component's render method in a custom context to avoid having to drill props
-                    match: "render()",
-                    replace: "$&{return $self.renderEmbed.call(this)}__render()"
+                    // Wrap the embed component's render method in a custom context to avoid having to drill props.
+                    // Anchored on the method definition (a "{" follows, and no "." precedes) so it can't
+                    // land on an unrelated .render() call site
+                    match: /(?<!\.)render\(\)\{/,
+                    replace: "render(){return $self.renderEmbed.call(this)}__render(){"
                 },
                 {
                     // Specify the index for individual items in embed.images
@@ -90,7 +93,7 @@ export default definePlugin({
         },
         {
             // Override the default renderAdjacentContent prop value for all types of embed components (renderImageComponent, renderVideoComponent...)
-            find: "mosaicStyleAlt:E,mediaLayoutType:A",
+            find: /mosaicStyleAlt:[A-Za-z_$][\w$]*,mediaLayoutType:/,
             replacement: {
                 match: /renderAdjacentContent:(\i)/g,
                 replace: "$&=$self.renderEmbedAccessory"
@@ -98,15 +101,15 @@ export default definePlugin({
         },
         // EXPRESSION PICKER
         {
-            find: '"aria-selected":Y===eE.kx.GIF,isActive:Y===eE.kx.GIF,viewType:eE.kx.GIF',
+            find: /"aria-selected":[A-Za-z_$][\w$]*===[A-Za-z_$][\w$]*\.[A-Za-z_$][\w$]*\.GIF,isActive:/,
             replacement: [
                 {
-                    match: /(\i)=(\i)\?\(0,\i\.jsx\)\((\i),\{id:\i\.g9,"aria-controls":\i\.ni,"aria-selected":(\i)===\i\.kx\.GIF,isActive:\4===\i\.kx\.GIF,viewType:\i\.kx\.GIF,children:\i\.intl\.string\(\i\.t(?:\.\i|\[".+?"\])\)\}\):null/,
+                    match: /(\i)=(\i)\?\(0,\i\.jsx\)\((\i),\{id:\i\.\i,"aria-controls":\i\.\i,"aria-selected":(\i)===\i\.\i\.GIF,isActive:\4===\i\.\i\.GIF,viewType:\i\.\i\.GIF,children:\i\.intl\.string\(\i\.t(?:\.\i|\[".+?"\])\)\}\):null/,
                     replace: "$1=$self.renderTabs($3,$4)"
                 },
                 {
-                    match: /(\i)===\i\.kx\.STICKER&&(\i)\?\(0,\i\.jsx\)\(\i,/,
-                    replace: "$self.renderFilePicker($1,a),$&"
+                    match: /(\i)===\i\.\i\.STICKER&&(\i)\?\(0,\i\.jsx\)\(\i,/,
+                    replace: "$self.renderFilePicker($1,$2),$&"
                 }
             ]
         },
@@ -120,10 +123,10 @@ export default definePlugin({
         },
         // FAVOURITE BUTTON
         {
-            find: "h.default.track(T.HAw.GIF_FAVORITED,{total_num_favorited:d})",
+            find: /\.track\([A-Za-z_$][\w$]*\.[A-Za-z_$][\w$]*\.GIF_FAVORITED,\{total_num_favorited:/,
             replacement: {
-                match: /function (\i)\(e\)\{E\.bW\.updateAsync\("favoriteGifs",t=>\{/,
-                replace: "async function $1(e){e=await $self.interceptAddToFavourites({...e,url:e.url});if(null==e)return;E.bW.updateAsync(\"favoriteGifs\",t=>{"
+                match: /function (\i)\((\i)\)\{(\i\.\i)\.updateAsync\("favoriteGifs",/,
+                replace: "async function $1($2){$2=await $self.interceptAddToFavourites({...$2,url:$2.url});if(null==$2)return;$3.updateAsync(\"favoriteGifs\","
             }
         }
     ],
@@ -214,14 +217,39 @@ export default definePlugin({
         insertTextIntoChatInputBox(url + " ");
         ExpressionPickerStore.closeExpressionPicker();
     },
+    // These three run inside Discord's own message render. Anything that throws here takes the whole
+    // client down with it, so always fall back to rendering Discord's original output untouched.
     renderAttachment(children: ReactNode, props: { item: AttachmentItem; }) {
-        return <AttachmentContext.Provider value={props.item}>{children}</AttachmentContext.Provider>;
+        try {
+            return <AttachmentContext.Provider value={props.item}>{children}</AttachmentContext.Provider>;
+        } catch (err) {
+            logger.error("Failed to provide the attachment context", err);
+            return children;
+        }
     },
     renderEmbed(this: EmbedComponent) {
-        return <EmbedContext.Provider value={this.props.embed}>{this.__render()}</EmbedContext.Provider>;
+        // Only possible if the render patch above went stale - a blank embed still beats a dead client
+        if (typeof this.__render !== "function") {
+            logger.error("The embed render patch didn't apply cleanly");
+            return null;
+        }
+
+        const rendered = this.__render();
+
+        try {
+            return <EmbedContext.Provider value={this.props.embed}>{rendered}</EmbedContext.Provider>;
+        } catch (err) {
+            logger.error("Failed to provide the embed context", err);
+            return rendered;
+        }
     },
     renderEmbedMosaicItem(children: ReactNode, index: number) {
-        return <EmbedMosaicContext.Provider value={index}>{children}</EmbedMosaicContext.Provider>;
+        try {
+            return <EmbedMosaicContext.Provider value={index}>{children}</EmbedMosaicContext.Provider>;
+        } catch (err) {
+            logger.error("Failed to provide the embed mosaic context", err);
+            return children;
+        }
     },
     renderAttachmentAccessory: () => <AttachmentAccessory />,
     renderEmbedAccessory: () => <EmbedAccessory />,
@@ -250,6 +278,13 @@ export default definePlugin({
         (ExpressionPickerStore as any).openExpressionPicker(view, activeViewType, channelId);
     },
     injectMediaButtons(buttons: ReactNode[], props: ChatBarProps) {
+        try {
+            this.injectMediaButtonsInner(buttons, props);
+        } catch (err) {
+            logger.error("Failed to inject the media picker buttons", err);
+        }
+    },
+    injectMediaButtonsInner(buttons: ReactNode[], props: ChatBarProps) {
         if (props?.disabled) return;
 
         const { showImageButton, showVideoButton, showFilesButton } = settings.store;

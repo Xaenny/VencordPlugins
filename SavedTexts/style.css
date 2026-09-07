@@ -221,3 +221,14 @@
     line-height: 1.45;
     font-size: 14px;
 }
+
+/* Fallback search input, used only when Discord's own search bar component can't be found */
+.vc-saved-texts-fallback-search {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border-strong, rgb(255 255 255 / 10%));
+    border-radius: 8px;
+    background: var(--input-background, rgb(0 0 0 / 20%));
+    color: var(--text-default, #dbdee1);
+    font-size: 14px;
+}

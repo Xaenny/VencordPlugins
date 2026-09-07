@@ -7,14 +7,15 @@
 import { classNameFactory } from "@utils/css";
 import { sendMessage } from "@utils/discord";
 import { proxyLazy } from "@utils/lazy";
+import { Logger } from "@utils/Logger";
 import { Queue } from "@utils/Queue";
 import { useForceUpdater } from "@utils/react";
 import { PluginNative } from "@utils/types";
 import { Channel } from "@vencord/discord-types";
-import { findByCodeLazy, findByPropsLazy } from "@webpack";
+import { filters, find } from "@webpack";
 import { Constants, DraftType, FluxDispatcher, MessageActions, PendingReplyStore, PermissionStore, RestAPI, Toasts, UploadAttachmentStore, UploadHandler, UploadManager, useCallback, useEffect, useMemo, useRef, UserSettingsActionCreators, UserSettingsProtoStore, useState, useStateFromStores } from "@webpack/common";
 import { deflateSync, inflateSync } from "fflate";
-import { Key, RefObject } from "react";
+import { ComponentType, Key, RefObject } from "react";
 import { JsonValue } from "type-fest";
 
 import { base64ToUint8Array, uint8ArrayToBase64 } from "./polyfills";
@@ -24,8 +25,92 @@ const Native = VencordNative.pluginHelpers.FavoriteMedia as PluginNative<typeof 
 
 export const cl = classNameFactory("vc-favouriteAnything-");
 
-export const useResizeObserver: ResizeObserverHook = findByCodeLazy("borderBoxSize", "blockSize", "inlineSize");
-export const ImageUtils: ImageUtils_ = findByPropsLazy("isAnimated", "getFormatQuality");
+export const logger = new Logger("FavoriteMedia");
+
+// Discord re-minifies its bundles on every client update, so any webpack lookup can go stale at any
+// time. Vencord's find*Lazy helpers *throw* when that happens (and on dev builds they throw even with
+// devtools closed), and a throw inside a React render tears down the whole client - which is how a
+// stale lookup for the favourite button turned every message with an image into a crash.
+// Everything below resolves lazily, never throws, and lets callers degrade to "no button" instead.
+
+/** Resolves `resolver` on first use and caches the result. Returns null instead of throwing. */
+export function lazyResolve<T>(name: string, resolver: () => T | null | undefined): () => T | null {
+    let resolved = false;
+    let value: T | null = null;
+
+    return () => {
+        if (!resolved) {
+            resolved = true;
+            try {
+                value = resolver() ?? null;
+            } catch (err) {
+                logger.error(`Lookup for ${name} threw`, err);
+                value = null;
+            }
+            if (!value) logger.warn(`Couldn't find ${name} in this Discord build - falling back`);
+        }
+
+        return value;
+    };
+}
+
+/** Like findComponentByCode, but tries several candidate filters and returns null if none match. */
+export function findComponentSafely<T = any>(name: string, candidates: string[][]): ComponentType<T> | null {
+    for (const code of candidates) {
+        try {
+            const res = find(filters.componentByCode(...code), { isIndirect: true });
+            if (res) return res as ComponentType<T>;
+        } catch (err) {
+            logger.error(`Lookup for ${name} threw`, err);
+        }
+    }
+
+    return null;
+}
+
+const getImageUtils = lazyResolve<ImageUtils_>(
+    "ImageUtils",
+    () => find(filters.byProps("isAnimated", "getFormatQuality"), { isIndirect: true }) as ImageUtils_
+);
+
+/** Safe wrapper around Discord's ImageUtils.isAnimated - assumes "not animated" if unavailable. */
+export function isAnimatedMedia(image: Parameters<ImageUtils_["isAnimated"]>[0]): boolean {
+    try {
+        return getImageUtils()?.isAnimated(image) ?? false;
+    } catch (err) {
+        logger.error("isAnimated failed", err);
+        return false;
+    }
+}
+
+/**
+ * Native replacement for Discord's internal resize observer hook (which was looked up by code and
+ * broke on client updates). Reports border-box size, matching the original hook's behaviour.
+ */
+export const useResizeObserver: ResizeObserverHook = (ref, callback, deps = []) => {
+    const callbackRef = useRef(callback);
+    callbackRef.current = callback;
+
+    useEffect(() => {
+        const element = ref.current;
+        if (!element || typeof ResizeObserver === "undefined") return;
+
+        const observer = new ResizeObserver(entries => {
+            const entry = entries[0];
+            if (!entry) return;
+
+            const [borderBox] = entry.borderBoxSize ?? [];
+            callbackRef.current({
+                width: borderBox?.inlineSize ?? entry.contentRect.width,
+                height: borderBox?.blockSize ?? entry.contentRect.height
+            });
+        });
+
+        observer.observe(element);
+        return () => observer.disconnect();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ref.current, ...deps]);
+};
 
 const defineItem = <const A, const B extends JsonValue>(item: CustomItemDef<A, B>) => item;
 function defineItems<T extends Record<CustomItemFormat, CustomItemDef>>(def: ItemsDef<T>) {
@@ -305,7 +390,7 @@ export function isMediaItem(item: FavouriteItem & { url?: string; }) {
     if (item.format === FavouriteItemFormat.IMAGE && hasStaticImageMarker(item.src))
         return false;
 
-    if (ImageUtils.isAnimated({ original: item.url, src: item.src, animated: false }))
+    if (isAnimatedMedia({ original: item.url, src: item.src, animated: false }))
         return true;
 
     if (item.format === FavouriteItemFormat.IMAGE) {
