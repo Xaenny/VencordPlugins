@@ -98,8 +98,21 @@ export default definePlugin({
             // place the url and dimensions live.
             find: /mosaicStyleAlt:[A-Za-z_$][\w$]*,mediaLayoutType:/,
             replacement: {
-                match: /(?:let|const|var)\{([^{}]*)renderAdjacentContent:(\i)([^{}]*)\}=(\i)/g,
+                // The image component of this module is skipped (it is matched by
+                // imageContainerClassName): images are handled at the base Image layer instead, which
+                // also covers attachments. Patching both would render the star twice on embeds.
+                match: /(?:let|const|var)\{((?:(?!imageContainerClassName)[^{}])*)renderAdjacentContent:(\i)((?:(?!imageContainerClassName)[^{}])*)\}=(\i)/g,
                 replace: "let{$1renderAdjacentContent:$2=(()=>$self.renderMediaAccessory($4))$3}=$4"
+            }
+        },
+        {
+            // Every image - embed, attachment or component - is ultimately rendered by this one
+            // component, which has a dedicated accessory slot that Discord only fills for animated
+            // images. Fall back to our star when nothing else claims the slot.
+            find: /"imageWrapper",/,
+            replacement: {
+                match: /\.\.\.(\i)\}=(\i),([\s\S]{0,1500}?)return (\i)=\4\?\?(\i),/,
+                replace: "...$1}=$2,$3return $4=$4??$5??$self.renderMediaAccessory($2,\"slot\"),"
             }
         },
         {
@@ -267,8 +280,8 @@ export default definePlugin({
             return children;
         }
     },
-    renderMediaAccessory(media: unknown) {
-        return <MediaAccessory media={media as Parameters<typeof MediaAccessory>[0]["media"]} />;
+    renderMediaAccessory(media: unknown, variant?: "slot") {
+        return <MediaAccessory media={media as Parameters<typeof MediaAccessory>[0]["media"]} variant={variant} />;
     },
     filterGifs: (item: FavouriteItem & { url?: string; }) => {
         return isMediaItem(item);
