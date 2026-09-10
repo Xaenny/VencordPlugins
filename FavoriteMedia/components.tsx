@@ -14,7 +14,7 @@ import { ComponentProps, ComponentType, ReactNode, Ref } from "react";
 import { EmbedContext, EmbedMosaicContext } from ".";
 import { SignedUrlsStore } from "./stores";
 import { AttachmentsComponentProps, CustomItemFormat, FavoriteButtonProps, FavouriteItemFormat, FilePickerItemProps, FilePickerProps, FullEmbed, FullMessageAttachment, ManaSearchBarProps, ScrollerBaseRef } from "./types";
-import { cl, defs, findComponentSafely, hasPermission, isAnimatedMedia, isDirectVideoFile, lazyResolve, markExternalVideoSrc, markStaticImageSrc, sendAttachment, stripExternalVideoMarker, useFavourites, useImageFavourites, useListScroller, useResizeObserver, useVirtualizedMasonry, useVideoFavourites } from "./utils";
+import { cl, defs, findComponentSafely, hasPermission, isAnimatedMedia, isDirectVideoFile, lazyResolve, logger, markExternalVideoSrc, markStaticImageSrc, sendAttachment, stripExternalVideoMarker, useFavourites, useImageFavourites, useListScroller, useResizeObserver, useVirtualizedMasonry, useVideoFavourites } from "./utils";
 
 // Each entry is a list of code fragments that must all appear in the component. They are tried in
 // order, so a build that renamed one set of minified locals can still be matched by a later,
@@ -684,7 +684,18 @@ function favouriteFromMediaProps(media: MediaComponentProps | undefined): Favori
         : { format: FavouriteItemFormat.IMAGE, src: markStaticImageSrc(src), url, width, height };
 }
 
-function MediaAccessoryInner({ media }: { media?: MediaComponentProps; }) {
+let warnedUnclassified = false;
+function warnUnclassifiedMedia(media: MediaComponentProps) {
+    if (warnedUnclassified) return;
+    warnedUnclassified = true;
+
+    logger.warn(
+        "No favourite button for this media - couldn't work out its url from the props Discord passed.",
+        "Props:", Object.keys(media).join(", ")
+    );
+}
+
+function MediaAccessoryInner({ media, variant }: { media?: MediaComponentProps; variant?: "slot"; }) {
     const embed = React.useContext(EmbedContext);
     const mosaicIndex = React.useContext(EmbedMosaicContext);
 
@@ -695,13 +706,19 @@ function MediaAccessoryInner({ media }: { media?: MediaComponentProps; }) {
         [embed, mosaicIndex, media]
     );
 
-    if (props == null) return null;
+    if (props == null) {
+        if (media != null) warnUnclassifiedMedia(media);
+        return null;
+    }
 
-    // Format NONE is only produced for the file card, which is laid out in a row rather than over a preview
-    const isFileCard = props.format === FavouriteItemFormat.NONE;
+    // "slot" means Discord's own accessory container is placing us, so we don't position ourselves.
+    // Format NONE is only produced for the file card, which is laid out in a row, not over a preview.
+    const className = variant === "slot"
+        ? "media-slot"
+        : props.format === FavouriteItemFormat.NONE ? "file-accessory" : "image-accessory";
 
     return (
-        <div className={cl(isFileCard ? "file-accessory" : "image-accessory")}>
+        <div className={cl(className)}>
             <FavoriteButton {...props} className={css(Classes, "gifFavoriteButton")} />
         </div>
     );

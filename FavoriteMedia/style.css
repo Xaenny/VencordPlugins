@@ -414,3 +414,15 @@
     color: var(--text-default, #dbdee1);
     font-size: 14px;
 }
+
+/* Rendered inside Discord's own accessory slot, which already positions it */
+.vc-favouriteAnything-media-slot > [class*="gifFavoriteButton"] {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+*:hover > .vc-favouriteAnything-media-slot > [class*="gifFavoriteButton"],
+[class*="imageWrapper"]:is(:hover, :focus-within) .vc-favouriteAnything-media-slot > [class*="gifFavoriteButton"],
+.vc-favouriteAnything-media-slot:is(:hover, :focus-within) > [class*="gifFavoriteButton"] {
+    opacity: 1;
+}
