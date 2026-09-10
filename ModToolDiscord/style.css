@@ -1,0 +1,233 @@
+/* Panel */
+
+.vc-modtool-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 4px 0 12px;
+}
+
+.vc-modtool-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 12px;
+    border: 1px solid var(--border-subtle, rgb(255 255 255 / 8%));
+    border-radius: 8px;
+    background: var(--background-secondary-alt, rgb(255 255 255 / 3%));
+}
+
+.vc-modtool-section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vc-modtool-section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--header-primary, #f2f3f5);
+}
+
+.vc-modtool-section-note,
+.vc-modtool-hint {
+    font-size: 12px;
+    color: var(--text-muted, #949ba4);
+}
+
+.vc-modtool-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--text-muted, #949ba4);
+}
+
+.vc-modtool-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.vc-modtool-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1 1 200px;
+    min-width: 0;
+}
+
+/* Chips */
+
+.vc-modtool-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.vc-modtool-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--button-outline-primary-border, rgb(120 130 255 / 60%));
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-default, #dbdee1);
+    font-size: 13px;
+    line-height: 1.3;
+}
+
+.vc-modtool-chip-pick {
+    cursor: pointer;
+}
+
+.vc-modtool-chip-pick:hover {
+    background: var(--background-modifier-hover, rgb(255 255 255 / 6%));
+}
+
+.vc-modtool-chip-active {
+    border-color: var(--brand-500, #5865f2);
+    background: var(--brand-experiment-a, rgb(88 101 242 / 20%));
+}
+
+.vc-modtool-chip-remove {
+    border: none;
+    background: none;
+    padding: 0;
+    color: inherit;
+    cursor: pointer;
+    font-size: 15px;
+    line-height: 1;
+    opacity: 0.7;
+}
+
+.vc-modtool-chip-remove:hover {
+    opacity: 1;
+}
+
+/* Punishment buttons */
+
+.vc-modtool-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.vc-modtool-action {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-strong, rgb(255 255 255 / 12%));
+    border-radius: 8px;
+    background: var(--background-secondary, rgb(255 255 255 / 4%));
+    color: var(--text-default, #dbdee1);
+    cursor: pointer;
+    text-align: start;
+}
+
+.vc-modtool-action:hover:not(:disabled) {
+    background: var(--background-modifier-hover, rgb(255 255 255 / 8%));
+}
+
+.vc-modtool-action:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.vc-modtool-action-command {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--text-muted, #949ba4);
+}
+
+.vc-modtool-action-label {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.vc-modtool-action-danger {
+    border-color: var(--status-danger, #f23f43);
+}
+
+.vc-modtool-action-danger .vc-modtool-action-label {
+    color: var(--status-danger, #f23f43);
+}
+
+.vc-modtool-action-active {
+    border-color: var(--brand-500, #5865f2);
+}
+
+.vc-modtool-preview {
+    display: block;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--background-tertiary, rgb(0 0 0 / 25%));
+    color: var(--text-muted, #949ba4);
+    font-size: 12px;
+    word-break: break-all;
+}
+
+/* Channel picker */
+
+.vc-modtool-channel-picker {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.vc-modtool-channel-current {
+    font-size: 14px;
+    color: var(--text-default, #dbdee1);
+}
+
+/* Settings */
+
+.vc-modtool-preset-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.vc-modtool-add-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vc-modtool-add-row > :first-child {
+    flex: 1;
+}
+
+.vc-modtool-empty {
+    font-size: 13px;
+    color: var(--text-muted, #949ba4);
+}
+
+.vc-modtool-channel-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.vc-modtool-channel-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.vc-modtool-channel-guild {
+    font-weight: 600;
+    color: var(--text-default, #dbdee1);
+}
+
+.vc-modtool-channel-name {
+    flex: 1;
+    color: var(--text-muted, #949ba4);
+}

@@ -71,6 +71,25 @@ Save and quickly reuse text snippets — like FavoriteMedia, but for text.
 
 ---
 
+### ModToolDiscord
+
+Moderation shortcuts for a command-driven bot — the punishment actions, presets and per-server
+command channel of a standalone mod tool, inside Discord itself.
+
+**What it does:**
+- Adds **Warn, Zap, Temp zap, Unzap, Timeout, Kick** and **Ban** to the **message** and **member** right-click menus, and to a **ModTool button on message hover**
+- Clicking one sends its command (e.g. `.to @user 1d spam`) straight to the channel you picked **for that server** — the view never switches channels
+- Each action's submenu offers your **time and reason presets**, so a different duration or reason is still one click
+- **Presets** for times and reasons, editable in plugin settings and stored for your Discord account
+- **Per-server command channel**, set by right-clicking a channel → *Send ModTool commands here*
+- A **punish panel** for full control — target, time, reason, channel and every action in one place
+- Command names are configurable, so `.to` / `.ban` can be whatever your bot uses
+- Kick and Ban open the panel first by default, so a destructive action is never a single stray click
+
+**Best for:** moderating with a bot whose commands you'd otherwise type out by hand.
+
+---
+
 ### HideGiftButton
 
 Removes the Nitro **gift button** from the chat input bar.
@@ -94,6 +113,7 @@ Removes the Nitro **gift button** from the chat input bar.
            ├── BetterFormattingRedux/
            ├── CustomLoadingLogo/
            ├── FavoriteMedia/
+           ├── ModToolDiscord/
            ├── SavedTexts/
            └── HideGiftButton/
    ```
@@ -126,6 +146,7 @@ Removes the Nitro **gift button** from the chat input bar.
 |---|---|
 | BetterFormattingRedux | ChatInputButtonAPI (built into Vencord) |
 | SavedTexts | ChatInputButtonAPI |
+| ModToolDiscord | MessagePopoverAPI (built into Vencord) |
 | FavoriteMedia + SavedTexts | Both plugins for the Texts tab in the picker |
 
 ---
@@ -149,6 +170,7 @@ For manual major/minor bumps, tag before pushing (e.g. `git tag v1.1.0 && git pu
 | **FavoriteMedia** | [nin0dev](https://git.nin0.dev/nin0), [Davri](https://github.com/Davr1), [TetraSsky](https://github.com/TetraSsky) (upstream), [Xaenny](https://github.com/Xaenny) (customizations) |
 | **SavedTexts** | [Xaenny](https://github.com/Xaenny) |
 | **HideGiftButton** | [Xaenny](https://github.com/Xaenny) |
+| **ModToolDiscord** | [Xaenny](https://github.com/Xaenny) |
 
 ---
 
@@ -156,7 +178,7 @@ For manual major/minor bumps, tag before pushing (e.g. `git tag v1.1.0 && git pu
 
 ### Original plugins by [Xaenny](https://github.com/Xaenny)
 
-**CustomLoadingLogo**, **SavedTexts**, and **HideGiftButton** are licensed under the **MIT License (with Attribution Requirements)**. See each plugin's `LICENSE` file for the full text.
+**CustomLoadingLogo**, **SavedTexts**, **HideGiftButton**, and **ModToolDiscord** are licensed under the **MIT License (with Attribution Requirements)**. See each plugin's `LICENSE` file for the full text.
 
 If you redistribute, republish, or share a modified version, you must:
 
