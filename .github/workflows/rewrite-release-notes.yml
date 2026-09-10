@@ -1,0 +1,44 @@
+name: Rewrite release notes
+
+# One-off cleanup: regenerates the notes for every existing release using the current
+# build-release-notes.sh, so older releases get the same short, readable format as new ones.
+# Run it from the Actions tab.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rewrite:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Regenerate the notes for every release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          chmod +x scripts/build-release-notes.sh
+
+          prev=""
+          for tag in $(git tag -l 'v*' --sort=v:refname); do
+            if ! gh release view "$tag" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+              echo "No release for ${tag}, skipping"
+              prev="$tag"
+              continue
+            fi
+
+            # v0.0.0 doesn't exist, so the first release gets everything up to its tag
+            ./scripts/build-release-notes.sh "${prev:-v0.0.0}" "$tag" release-body.md
+            gh release edit "$tag" --repo "${GITHUB_REPOSITORY}" --notes-file release-body.md
+            echo "Updated ${tag}"
+
+            prev="$tag"
+          done
