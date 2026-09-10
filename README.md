@@ -77,8 +77,8 @@ Moderation shortcuts for a command-driven bot — the punishment actions, preset
 command channel of a standalone mod tool, inside Discord itself.
 
 **What it does:**
-- Adds **Warn, Zap, Temp zap, Unzap, Timeout, Kick** and **Ban** to the **message** and **member** right-click menus, and to a **ModTool button on message hover**
-- Clicking one sends its command (e.g. `.to @user 1d spam`) straight to the channel you picked **for that server** — the view never switches channels
+- Adds a **ModTool** entry to the **message** and **member** right-click menus that opens the punish panel, plus a **ModTool button on message hover** for the actions directly
+- Every action sends its command (e.g. `.to @user 1d spam`) straight to the channel you picked **for that server** — the view never switches channels
 - Each action's submenu offers your **time and reason presets**, so a different duration or reason is still one click
 - **Presets** for times and reasons, editable in plugin settings and stored for your Discord account
 - **Per-server command channel**, set by right-clicking a channel → *Send ModTool commands here*
