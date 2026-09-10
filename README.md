@@ -106,31 +106,40 @@ Removes the Nitro **gift button** from the chat input bar.
 
 ## Installation
 
-### One command (recommended)
+### Installer (recommended)
 
-Sets up Vencord, these plugins and a dev build from scratch — and updates all three when run again.
+Download **`VencordPluginsInstaller.exe`** from the
+[latest release](https://github.com/Xaenny/VencordPlugins/releases/latest) and run it.
 
-1. Install [Git](https://git-scm.com/download/win) and [Node.js 22 or newer](https://nodejs.org) if you don't have them.
-2. Clone this repo and run the installer:
-   ```powershell
-   git clone https://github.com/Xaenny/VencordPlugins
-   cd VencordPlugins
-   .\install.bat
-   ```
-   (or double-click `install.bat`)
+It checks your prerequisites, installs pnpm if needed, clones Vencord, installs its dependencies,
+copies these plugins into `src\userplugins`, builds a dev build, then **asks which Discord to
+patch** — only offering the versions actually installed on your machine — and patches it.
 
-It checks your prerequisites, installs pnpm if needed, clones Vencord to `%USERPROFILE%\Vencord`,
-installs its dependencies, copies the plugins into `src\userplugins`, builds a dev build, and runs
-the Vencord installer so you can patch Discord. Pick the Discord you actually use (Stable / PTB /
-Canary) when it asks, and close Discord first.
+You need [Git](https://git-scm.com/download/win) and [Node.js 22 or newer](https://nodejs.org)
+installed first; the installer tells you if either is missing. Close Discord when it asks.
 
-Then restart Discord fully and enable the plugins in **Vencord Settings → Plugins**.
+Then start Discord and enable the plugins in **Vencord Settings → Plugins**.
 
-Options:
+Options, if you run it from a terminal:
+
+```
+VencordPluginsInstaller.exe -vencord D:\Vencord   put Vencord somewhere else
+VencordPluginsInstaller.exe -branch ptb           don't ask, patch PTB
+VencordPluginsInstaller.exe -skip-inject          build only, Discord already patched
+VencordPluginsInstaller.exe -y                    never prompt (needs -branch)
+```
+
+It is not code-signed, so Windows SmartScreen may warn the first time. The source is
+[`installer/main.go`](installer/main.go) and each release is built from it by GitHub Actions.
+
+### PowerShell script
+
+Same thing without the exe, if you'd rather read the script first:
 
 ```powershell
-.\install.bat -Vencord D:\Vencord   # put Vencord somewhere else
-.\install.bat -SkipInject           # build only, Discord already patched
+git clone https://github.com/Xaenny/VencordPlugins
+cd VencordPlugins
+.\install.bat
 ```
 
 ### Updating

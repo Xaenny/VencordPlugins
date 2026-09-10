@@ -4,3 +4,6 @@ Thumbs.db
 *.log
 release-body.md
 RELEASE_NOTES*.md
+
+# built installer
+VencordPluginsInstaller.exe
