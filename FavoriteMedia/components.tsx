@@ -11,9 +11,9 @@ import { findCssClassesLazy } from "@webpack";
 import { ChannelStore, ExpressionPickerStore, ListScrollerThin, lodash, PermissionsBits, PermissionStore, React, useCallback, useEffect, useMemo, useRef, useState, useStateFromStores } from "@webpack/common";
 import { ComponentProps, ComponentType, ReactNode, Ref } from "react";
 
-import { AttachmentContext, EmbedContext, EmbedMosaicContext } from ".";
+import { EmbedContext, EmbedMosaicContext } from ".";
 import { SignedUrlsStore } from "./stores";
-import { AttachmentItem, AttachmentsComponentProps, CustomItemFormat, FavoriteButtonProps, FavouriteItemFormat, FilePickerItemProps, FilePickerProps, FullMessageAttachment, ManaSearchBarProps, ScrollerBaseRef } from "./types";
+import { AttachmentsComponentProps, CustomItemFormat, FavoriteButtonProps, FavouriteItemFormat, FilePickerItemProps, FilePickerProps, FullEmbed, FullMessageAttachment, ManaSearchBarProps, ScrollerBaseRef } from "./types";
 import { cl, defs, findComponentSafely, hasPermission, isAnimatedMedia, isDirectVideoFile, lazyResolve, markExternalVideoSrc, markStaticImageSrc, sendAttachment, stripExternalVideoMarker, useFavourites, useImageFavourites, useListScroller, useResizeObserver, useVirtualizedMasonry, useVideoFavourites } from "./utils";
 
 // Each entry is a list of code fragments that must all appear in the component. They are tried in
@@ -575,103 +575,142 @@ export function VideoPickerItem({ url, src, width, height, layout, onSubmit }: {
     );
 }
 
-function EmbedAccessoryInner() {
+/**
+ * Props Discord hands its media components (image, video and file card). Attachments are rendered
+ * by the same components as embeds but carry no embed context, so for them these props are the only
+ * place the media's url and dimensions live.
+ */
+interface MediaComponentProps {
+    src?: string;
+    original?: string;
+    url?: string;
+    downloadUrl?: string;
+    poster?: string;
+    width?: number;
+    height?: number;
+    srcIsAnimated?: boolean;
+    fileName?: string;
+    fileSize?: number;
+    mimeType?: string;
+    contentType?: string;
+    downloadContentType?: string;
+}
+
+const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|avif|bmp|tiff?)$/i;
+
+function favouriteFromEmbed(embed: FullEmbed, mosaicIndex: number | null): FavoriteButtonProps | null {
+    if (embed.type === "gifv") return null;
+
+    const { video, image, images, thumbnail } = embed;
+
+    if (video) {
+        // This field is missing on videos by third party providers (TikTok, YouTube ...)
+        const isProxiedVideo = !!video.proxyURL;
+
+        // External videos don't have a video.proxyURL property that could be used for the preview - use the static thumbnail instead
+        const src = video.proxyURL ?? thumbnail?.proxyURL ?? video.url;
+
+        // External videos' content.url usually doesn't point to a valid resource that could be embedded
+        const url = !isProxiedVideo ? embed.url! : video.url;
+        const shouldMarkExternal = !isDirectVideoFile(url);
+        const previewSrc = shouldMarkExternal ? (thumbnail?.proxyURL ?? src) : src;
+
+        return {
+            ...video,
+            format: FavouriteItemFormat.VIDEO,
+            src: shouldMarkExternal ? markExternalVideoSrc(previewSrc) : previewSrc,
+            url
+        };
+    }
+
+    const img = (mosaicIndex != null && images?.[mosaicIndex]) || image;
+    if (!img) return null;
+
+    const src = img.proxyURL ?? img.url;
+
+    // Do not render the custom embed accessory if the original image already has a gif accessory
+    if (isAnimatedMedia({ ...img, original: img.url, src, animated: false })) return null;
+
+    return { ...img, format: FavouriteItemFormat.IMAGE, src: markStaticImageSrc(src) };
+}
+
+function favouriteFromMediaProps(media: MediaComponentProps | undefined): FavoriteButtonProps | null {
+    if (media == null) return null;
+
+    const { width = 600, height = 400, fileName, fileSize } = media;
+
+    const url = media.original ?? media.downloadUrl ?? media.url ?? media.src;
+    if (!url) return null;
+
+    const contentType = media.mimeType ?? media.contentType ?? media.downloadContentType ?? "";
+
+    // Identify visual media positively - the same components also render audio players and text
+    // file previews, which have a src but nothing worth showing as a favourite thumbnail
+    const isVideo = contentType.startsWith("video/") || isDirectVideoFile(url);
+    const isImage = !isVideo && (
+        contentType.startsWith("image/")
+        || IMAGE_EXTENSIONS.test(URL.parse(url)?.pathname ?? "")
+        || media.original != null
+    );
+
+    if (!isVideo && !isImage) {
+        // A file card, audio player or text preview. It has no preview image, so its metadata is
+        // encoded into src the way the Files tab expects. This isn't a valid url yet -
+        // interceptAddToFavourites turns it into a real thumbnail url (keeping the metadata in the
+        // hash) when the star is clicked.
+        if (fileName == null) return null;
+
+        const src = defs.encode(CustomItemFormat.ATTACHMENT, {
+            id: "0",
+            filename: fileName,
+            size: fileSize ?? 0,
+            url,
+            proxy_url: url,
+            content_type: contentType || "application/octet-stream",
+            spoiler: fileName.startsWith("SPOILER_")
+        })?.toString();
+        if (!src) return null;
+
+        return { format: FavouriteItemFormat.NONE, src, url, width, height };
+    }
+
+    const src = media.src ?? media.poster ?? url;
+
+    // Animated media already has Discord's own favourite button
+    if (isAnimatedMedia({ src, original: url, animated: false, srcIsAnimated: media.srcIsAnimated })) return null;
+
+    return isVideo
+        ? { format: FavouriteItemFormat.VIDEO, src, url, width, height }
+        : { format: FavouriteItemFormat.IMAGE, src: markStaticImageSrc(src), url, width, height };
+}
+
+function MediaAccessoryInner({ media }: { media?: MediaComponentProps; }) {
     const embed = React.useContext(EmbedContext);
     const mosaicIndex = React.useContext(EmbedMosaicContext);
 
-    const props: FavoriteButtonProps | null = useMemo(() => {
-        if (!embed || embed.type === "gifv") return null;
+    // Inside an embed the embed itself is the better source (it knows about gifv, external video
+    // providers and thumbnails). Everything else - uploaded images, videos and files - only has props.
+    const props: FavoriteButtonProps | null = useMemo(
+        () => embed != null ? favouriteFromEmbed(embed, mosaicIndex) : favouriteFromMediaProps(media),
+        [embed, mosaicIndex, media]
+    );
 
-        const { video, image, images, thumbnail } = embed;
+    if (props == null) return null;
 
-        if (video) {
-            // This field is missing on videos by third party providers (TikTok, YouTube ...)
-            const isProxiedVideo = !!video.proxyURL;
-
-            // External videos don't have a video.proxyURL property that could be used for the preview - use the static thumbnail instead
-            const src = video.proxyURL ?? thumbnail?.proxyURL ?? video.url;
-
-            // External videos' content.url usually doesn't point to a valid resource that could be embedded
-            const url = !isProxiedVideo ? embed.url! : video.url;
-            const shouldMarkExternal = !isDirectVideoFile(url);
-            const previewSrc = shouldMarkExternal ? (thumbnail?.proxyURL ?? src) : src;
-
-            return {
-                ...video,
-                format: FavouriteItemFormat.VIDEO,
-                src: shouldMarkExternal ? markExternalVideoSrc(previewSrc) : previewSrc,
-                url
-            };
-        }
-
-        const img = (mosaicIndex != null && images?.[mosaicIndex]) || image;
-        if (!img) return null;
-
-        const src = img.proxyURL ?? img.url;
-
-        // Do not render the custom embed accessory if the original image already has a gif accessory
-        const isAnimated = isAnimatedMedia({ ...img, original: img.url, src, animated: false });
-        if (isAnimated) return null;
-
-        return { ...img, format: FavouriteItemFormat.IMAGE, src: markStaticImageSrc(src) };
-    }, [embed, mosaicIndex]);
+    // Format NONE is only produced for the file card, which is laid out in a row rather than over a preview
+    const isFileCard = props.format === FavouriteItemFormat.NONE;
 
     return (
-        props && (
-            <div className={cl("image-accessory")}>
-                <FavoriteButton {...props} className={css(Classes, "gifFavoriteButton")} />
-            </div>
-        )
+        <div className={cl(isFileCard ? "file-accessory" : "image-accessory")}>
+            <FavoriteButton {...props} className={css(Classes, "gifFavoriteButton")} />
+        </div>
     );
-}
-
-const visualMediaFormats: Partial<Record<AttachmentItem["type"], FavouriteItemFormat>> = Object.freeze({
-    IMAGE: FavouriteItemFormat.IMAGE,
-    VIDEO: FavouriteItemFormat.VIDEO,
-    CLIP: FavouriteItemFormat.VIDEO
-});
-
-function AttachmentAccessoryInner() {
-    const attachment = React.useContext(AttachmentContext);
-
-    const props: FavoriteButtonProps | null = useMemo(() => {
-        if (!attachment?.downloadUrl) return null;
-        const { originalItem, type, downloadUrl, width = 600, height = 400, srcIsAnimated } = attachment;
-
-        // Do not render the custom accessory if the original attachment component already has a gif accessory
-        const isAnimated = isAnimatedMedia({
-            original: originalItem.url,
-            src: originalItem.proxy_url,
-            animated: false,
-            srcIsAnimated
-        });
-        if (isAnimated) return null;
-
-        if (type in visualMediaFormats) {
-            const format = visualMediaFormats[type]!;
-            const src = format === FavouriteItemFormat.IMAGE
-                ? markStaticImageSrc(originalItem.proxy_url)
-                : originalItem.proxy_url;
-            return { format, src, url: downloadUrl, width, height };
-        }
-
-        // Non visual attachments have to be encoded to store metadata in the src property.
-        // Note that this isn't a valid url yet, the full url (with a fallback image for vanilla client compat)
-        // is generated via `getThumbnailUrl` once the user clicks the favourite button
-        const src = defs.encode(CustomItemFormat.ATTACHMENT, originalItem)?.toString();
-        if (!src) return null;
-
-        return { format: FavouriteItemFormat.NONE, src, url: downloadUrl, width, height };
-    }, [attachment]);
-
-    return props && <FavoriteButton {...props} className={cl("attachment-accessory")} />;
 }
 
 export const FilePicker = ErrorBoundary.wrap(FilePickerInner, { noop: true });
 export const ImagePicker = ErrorBoundary.wrap(ImagePickerInner, { noop: true });
 export const VideoPicker = ErrorBoundary.wrap(VideoPickerInner, { noop: true });
-export const EmbedAccessory = ErrorBoundary.wrap(EmbedAccessoryInner, { noop: true });
-export const AttachmentAccessory = ErrorBoundary.wrap(AttachmentAccessoryInner, { noop: true });
+export const MediaAccessory = ErrorBoundary.wrap(MediaAccessoryInner, { noop: true });
 
 /** Which Discord components this build managed to find - logged once on start. */
 export function lookupSelfCheck() {

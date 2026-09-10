@@ -322,11 +322,40 @@
     :has(> &) {
         position: relative;
     }
+}
 
-    :is(.imageWrapper:is(:hover, :focus-within) ~ &, :hover, :focus-within) > [class*="gifFavoriteButton"] {
-        opacity: 1;
-        transform: translateY(0);
-    }
+/* Discord's own button class keeps itself hidden until *its* container is hovered, and that
+   container isn't ours, so drive the star's visibility from our own wrapper instead. Matching on
+   [class*="gifFavoriteButton"] rather than a bare class name, because Discord hashes them. */
+.vc-favouriteAnything-image-accessory > [class*="gifFavoriteButton"] {
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+*:hover > .vc-favouriteAnything-image-accessory > [class*="gifFavoriteButton"],
+.vc-favouriteAnything-image-accessory:is(:hover, :focus-within) > [class*="gifFavoriteButton"] {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* The file card lays its children out in a row, so the star sits beside the file name */
+.vc-favouriteAnything-file-accessory {
+    display: flex;
+    align-items: center;
+    margin-inline-start: 8px;
+    cursor: pointer;
+}
+
+.vc-favouriteAnything-file-accessory > [class*="gifFavoriteButton"] {
+    position: static;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+*:hover > .vc-favouriteAnything-file-accessory > [class*="gifFavoriteButton"],
+.vc-favouriteAnything-file-accessory:is(:hover, :focus-within) > [class*="gifFavoriteButton"] {
+    opacity: 1;
 }
 
 .vc-favouriteAnything-attachment-accessory {

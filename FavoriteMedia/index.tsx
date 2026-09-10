@@ -14,17 +14,16 @@ import { findCssClassesLazy, proxyLazyWebpack } from "@webpack";
 import { ExpressionPickerStore, React } from "@webpack/common";
 import { ComponentType, ReactNode } from "react";
 
-import { AttachmentAccessory, EmbedAccessory, FilePicker, ImagePicker, lookupSelfCheck, VideoPicker } from "./components";
+import { FilePicker, ImagePicker, lookupSelfCheck, MediaAccessory, VideoPicker } from "./components";
 import { TextPicker } from "../SavedTexts/TextPicker";
 import { settings } from "./settings";
 import { SignedUrlsStore } from "./stores";
 import managedStyle from "./style.css?managed";
-import { AttachmentItem, EmbedComponent, ExpressionPickerTabProps, ExpressionPickerView, FavouriteItem, FavouriteItemFormat, FullEmbed } from "./types";
+import { EmbedComponent, ExpressionPickerTabProps, ExpressionPickerView, FavouriteItem, FavouriteItemFormat, FullEmbed } from "./types";
 import { getThumbnailUrl, isMediaItem, logger } from "./utils";
 
 export const EmbedContext = proxyLazyWebpack(() => React.createContext<null | FullEmbed>(null));
 export const EmbedMosaicContext = proxyLazyWebpack(() => React.createContext<null | number>(null));
-export const AttachmentContext = proxyLazyWebpack(() => React.createContext<null | AttachmentItem>(null));
 
 const ButtonWrapperClasses = findCssClassesLazy("button", "buttonWrapper", "notificationDot");
 const ChannelTextAreaClasses = findCssClassesLazy("buttonContainer", "channelTextArea", "button");
@@ -92,11 +91,24 @@ export default definePlugin({
             ]
         },
         {
-            // Override the default renderAdjacentContent prop value for all types of embed components (renderImageComponent, renderVideoComponent...)
+            // Default the renderAdjacentContent prop of every media component (image, video, file card)
+            // to our accessory. The default expression is evaluated inside the component, so it can
+            // close over the props object and hand it to the accessory - uploaded attachments render
+            // through these same components but have no embed context, and their props are the only
+            // place the url and dimensions live.
             find: /mosaicStyleAlt:[A-Za-z_$][\w$]*,mediaLayoutType:/,
             replacement: {
-                match: /renderAdjacentContent:(\i)/g,
-                replace: "$&=$self.renderEmbedAccessory"
+                match: /(?:let|const|var)\{([^{}]*)renderAdjacentContent:(\i)([^{}]*)\}=(\i)/g,
+                replace: "let{$1renderAdjacentContent:$2=(()=>$self.renderMediaAccessory($4))$3}=$4"
+            }
+        },
+        {
+            // The file card lives in its own module, so it needs the same default separately.
+            // Its props (url, fileName, fileSize) are what the Files tab stores.
+            find: /url:[A-Za-z_$][\w$]*,fileName:[A-Za-z_$][\w$]*,fileSize:[A-Za-z_$][\w$]*,onClick:[A-Za-z_$][\w$]*,onContextMenu:[A-Za-z_$][\w$]*,renderAdjacentContent:/,
+            replacement: {
+                match: /(?:let|const|var)\{([^{}]*)renderAdjacentContent:(\i)([^{}]*)\}=(\i)/,
+                replace: "let{$1renderAdjacentContent:$2=(()=>$self.renderMediaAccessory($4))$3}=$4"
             }
         },
         // EXPRESSION PICKER
@@ -229,16 +241,8 @@ export default definePlugin({
         insertTextIntoChatInputBox(url + " ");
         ExpressionPickerStore.closeExpressionPicker();
     },
-    // These three run inside Discord's own message render. Anything that throws here takes the whole
+    // These run inside Discord's own message render. Anything that throws here takes the whole
     // client down with it, so always fall back to rendering Discord's original output untouched.
-    renderAttachment(children: ReactNode, props: { item: AttachmentItem; }) {
-        try {
-            return <AttachmentContext.Provider value={props.item}>{children}</AttachmentContext.Provider>;
-        } catch (err) {
-            logger.error("Failed to provide the attachment context", err);
-            return children;
-        }
-    },
     renderEmbed(this: EmbedComponent) {
         // Only possible if the render patch above went stale - a blank embed still beats a dead client
         if (typeof this.__render !== "function") {
@@ -263,8 +267,9 @@ export default definePlugin({
             return children;
         }
     },
-    renderAttachmentAccessory: () => <AttachmentAccessory />,
-    renderEmbedAccessory: () => <EmbedAccessory />,
+    renderMediaAccessory(media: unknown) {
+        return <MediaAccessory media={media as Parameters<typeof MediaAccessory>[0]["media"]} />;
+    },
     filterGifs: (item: FavouriteItem & { url?: string; }) => {
         return isMediaItem(item);
     },
