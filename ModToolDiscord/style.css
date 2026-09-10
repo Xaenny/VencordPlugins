@@ -231,3 +231,13 @@
     flex: 1;
     color: var(--text-muted, #949ba4);
 }
+
+.vc-modtool-checkbox-label {
+    font-size: 14px;
+    color: var(--text-default, #dbdee1);
+}
+
+.vc-modtool-warning {
+    font-size: 12px;
+    color: var(--text-warning, #f0b232);
+}

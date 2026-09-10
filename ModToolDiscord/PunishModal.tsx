@@ -6,17 +6,20 @@
  * See LICENSE in this directory for redistribution terms.
  */
 
-import { RenderModalProps } from "@vencord/discord-types";
-import { Button, ChannelStore, Modal, openModal, SelectedChannelStore, TextInput, UserStore, useState } from "@webpack/common";
+import { Message, RenderModalProps } from "@vencord/discord-types";
+import { Button, ChannelStore, Checkbox, Modal, openModal, SelectedChannelStore, showToast, TextInput, Toasts, UserStore, useState } from "@webpack/common";
 
 import { ACTIONS, PunishAction } from "./actions";
-import { commandFor, currentReason, currentTime, previewCommand, sendPunishment } from "./punish";
-import { getGuildChannel, getPresets, setGuildChannel } from "./storage";
+import { commandFor, currentReason, currentTime, deleteMessage, forwardMessage, previewCommand, sendPunishment } from "./punish";
+import { settings } from "./settings";
+import { getGuildChannel, getGuildForwardChannel, getPresets, setGuildChannel, setGuildForwardChannel } from "./storage";
 
 interface PunishModalProps extends RenderModalProps {
     userId: string;
     guildId: string | null | undefined;
     action?: PunishAction;
+    /** Present when opened from a message - without it there is nothing to forward or delete */
+    message?: Message;
 }
 
 function Chips({ values, active, onPick }: { values: string[]; active: string; onPick: (value: string) => void; }) {
@@ -37,17 +40,21 @@ function Chips({ values, active, onPick }: { values: string[]; active: string; o
     );
 }
 
-function PunishModal({ userId: initialUserId, guildId, action, ...props }: PunishModalProps) {
+function PunishModal({ userId: initialUserId, guildId, action, message, ...props }: PunishModalProps) {
     const presets = getPresets();
 
     const [userId, setUserId] = useState(initialUserId);
     const [time, setTime] = useState(currentTime());
     const [reason, setReason] = useState(currentReason());
     const [channelId, setChannelId] = useState(getGuildChannel(guildId) ?? "");
+    const [forwardChannelId, setForwardChannelId] = useState(getGuildForwardChannel(guildId) ?? "");
+    const [shouldForward, setShouldForward] = useState(settings.store.forwardByDefault);
+    const [shouldDelete, setShouldDelete] = useState(settings.store.deleteByDefault);
     const [busy, setBusy] = useState(false);
 
     const user = UserStore.getUser(userId);
     const channel = channelId ? ChannelStore.getChannel(channelId) : null;
+    const forwardChannel = forwardChannelId ? ChannelStore.getChannel(forwardChannelId) : null;
 
     function useCurrentChannel() {
         const current = SelectedChannelStore.getChannelId();
@@ -57,10 +64,19 @@ function PunishModal({ userId: initialUserId, guildId, action, ...props }: Punis
         if (guildId) setGuildChannel(guildId, current);
     }
 
+    function useCurrentForwardChannel() {
+        const current = SelectedChannelStore.getChannelId();
+        if (!current) return;
+
+        setForwardChannelId(current);
+        if (guildId) setGuildForwardChannel(guildId, current);
+    }
+
     async function run(picked: PunishAction) {
         if (!userId.trim() || busy) return;
 
         setBusy(true);
+
         const result = await sendPunishment({
             action: picked,
             userId: userId.trim(),
@@ -69,9 +85,32 @@ function PunishModal({ userId: initialUserId, guildId, action, ...props }: Punis
             reason,
             channelId: channelId || undefined
         });
-        setBusy(false);
 
-        if (result.ok) props.onClose();
+        // The command is the primary action - if it didn't go out, leave the message alone
+        if (!result.ok) {
+            setBusy(false);
+            return;
+        }
+
+        // Forward first, so the message is preserved before it is deleted. If forwarding fails the
+        // delete is skipped too, rather than destroying the thing we failed to keep a copy of.
+        let forwarded = true;
+        if (message && shouldForward) {
+            forwarded = forwardChannelId
+                ? await forwardMessage(message, forwardChannelId)
+                : false;
+
+            if (!forwardChannelId) {
+                showToast("ModTool: no forward channel set for this server", Toasts.Type.FAILURE);
+            }
+        }
+
+        if (message && shouldDelete && forwarded) {
+            deleteMessage(message.channel_id, message.id);
+        }
+
+        setBusy(false);
+        props.onClose();
     }
 
     const preview = action
@@ -124,6 +163,56 @@ function PunishModal({ userId: initialUserId, guildId, action, ...props }: Punis
                     </div>
                 </section>
 
+                {message && (
+                    <section className="vc-modtool-section">
+                        <div className="vc-modtool-section-head">
+                            <span className="vc-modtool-section-title">Message</span>
+                            <span className="vc-modtool-section-note">Applied after the command is sent</span>
+                        </div>
+
+                        <Checkbox
+                            value={shouldForward}
+                            onChange={(_e: unknown, value: boolean) => {
+                                setShouldForward(value);
+                                settings.store.forwardByDefault = value;
+                            }}
+                            size={20}
+                        >
+                            <span className="vc-modtool-checkbox-label">Forward the message</span>
+                        </Checkbox>
+
+                        {shouldForward && (
+                            <div className="vc-modtool-channel-picker">
+                                <span className="vc-modtool-channel-current">
+                                    {forwardChannel
+                                        ? `Forwarding to #${forwardChannel.name}`
+                                        : forwardChannelId || "No forward channel set for this server"}
+                                </span>
+                                <Button size={Button.Sizes.SMALL} onClick={useCurrentForwardChannel}>
+                                    Use current channel
+                                </Button>
+                            </div>
+                        )}
+
+                        <Checkbox
+                            value={shouldDelete}
+                            onChange={(_e: unknown, value: boolean) => {
+                                setShouldDelete(value);
+                                settings.store.deleteByDefault = value;
+                            }}
+                            size={20}
+                        >
+                            <span className="vc-modtool-checkbox-label">Delete the message</span>
+                        </Checkbox>
+
+                        {shouldForward && !forwardChannelId && (
+                            <span className="vc-modtool-warning">
+                                Pick a forward channel, or the message won't be forwarded{shouldDelete ? " - and it won't be deleted either" : ""}.
+                            </span>
+                        )}
+                    </section>
+                )}
+
                 <section className="vc-modtool-section">
                     <div className="vc-modtool-section-head">
                         <span className="vc-modtool-section-title">Punishments</span>
@@ -151,6 +240,13 @@ function PunishModal({ userId: initialUserId, guildId, action, ...props }: Punis
     );
 }
 
-export function openPunishModal(userId: string, guildId: string | null | undefined, action?: PunishAction) {
-    openModal(props => <PunishModal {...props} userId={userId} guildId={guildId} action={action} />);
+export function openPunishModal(
+    userId: string,
+    guildId: string | null | undefined,
+    action?: PunishAction,
+    message?: Message
+) {
+    openModal(props => (
+        <PunishModal {...props} userId={userId} guildId={guildId} action={action} message={message} />
+    ));
 }

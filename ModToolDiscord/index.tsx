@@ -16,7 +16,7 @@ import { ACTIONS, PunishAction } from "./actions";
 import { currentReason, currentTime, sendPunishment } from "./punish";
 import { openPunishModal } from "./PunishModal";
 import { settings } from "./settings";
-import { getGuildChannel, getPresets, loadStorage, logger, setGuildChannel } from "./storage";
+import { getGuildChannel, getGuildForwardChannel, getPresets, loadStorage, logger, setGuildChannel, setGuildForwardChannel } from "./storage";
 import managedStyle from "./style.css?managed";
 
 export const ModToolIcon: IconComponent = ({ height = 24, width = 24, className }) => (
@@ -116,27 +116,27 @@ function punishItem(action: PunishAction, userId: string, guildId: string | null
     );
 }
 
-function punishItems(userId: string, guildId: string | null | undefined): ReactNode[] {
+function punishItems(userId: string, guildId: string | null | undefined, message?: Message): ReactNode[] {
     return [
         ...ACTIONS.map(action => punishItem(action, userId, guildId)),
         <Menu.MenuItem
             id="vc-modtool-panel"
             key="vc-modtool-panel"
             label="Punish..."
-            action={() => openPunishModal(userId, guildId)}
+            action={() => openPunishModal(userId, guildId, undefined, message)}
         />
     ];
 }
 
 /** Right-click menus get one entry that opens the panel - the actions live in the panel itself. */
-function modToolItem(userId: string, guildId: string | null | undefined) {
+function modToolItem(userId: string, guildId: string | null | undefined, message?: Message) {
     return (
         <Menu.MenuItem
             id="vc-modtool"
             key="vc-modtool"
             label="ModTool"
             icon={ModToolIcon}
-            action={() => openPunishModal(userId, guildId)}
+            action={() => openPunishModal(userId, guildId, undefined, message)}
         />
     );
 }
@@ -155,7 +155,7 @@ const messageContextPatch: NavContextMenuPatchCallback = (children, props: { mes
 
     children.push(
         <Menu.MenuGroup key="vc-modtool">
-            {modToolItem(message.author.id, guildId)}
+            {modToolItem(message.author.id, guildId, message)}
         </Menu.MenuGroup>
     );
 };
@@ -175,19 +175,34 @@ const channelContextPatch: NavContextMenuPatchCallback = (children, props: { cha
     const { channel } = props;
     if (!channel?.guild_id) return;
 
-    const isTarget = getGuildChannel(channel.guild_id) === channel.id;
+    const isCommandTarget = getGuildChannel(channel.guild_id) === channel.id;
+    const isForwardTarget = getGuildForwardChannel(channel.guild_id) === channel.id;
 
     children.push(
         <Menu.MenuGroup key="vc-modtool-channel">
             <Menu.MenuItem
                 id="vc-modtool-set-channel"
-                label={isTarget ? "Stop sending ModTool commands here" : "Send ModTool commands here"}
+                label={isCommandTarget ? "Stop sending ModTool commands here" : "Send ModTool commands here"}
                 action={() => {
-                    setGuildChannel(channel.guild_id, isTarget ? null : channel.id);
+                    setGuildChannel(channel.guild_id, isCommandTarget ? null : channel.id);
                     Toasts.show({
-                        message: isTarget
-                            ? "ModTool: channel cleared for this server"
+                        message: isCommandTarget
+                            ? "ModTool: command channel cleared for this server"
                             : `ModTool: commands for this server now go to #${channel.name}`,
+                        id: Toasts.genId(),
+                        type: Toasts.Type.SUCCESS
+                    });
+                }}
+            />
+            <Menu.MenuItem
+                id="vc-modtool-set-forward-channel"
+                label={isForwardTarget ? "Stop forwarding ModTool messages here" : "Forward ModTool messages here"}
+                action={() => {
+                    setGuildForwardChannel(channel.guild_id, isForwardTarget ? null : channel.id);
+                    Toasts.show({
+                        message: isForwardTarget
+                            ? "ModTool: forward channel cleared for this server"
+                            : `ModTool: messages for this server are forwarded to #${channel.name}`,
                         id: Toasts.genId(),
                         type: Toasts.Type.SUCCESS
                     });
@@ -232,7 +247,7 @@ export default definePlugin({
                         onClose={ContextMenuApi.closeContextMenu}
                         aria-label="ModTool punishments"
                     >
-                        {punishItems(message.author.id, guildId)}
+                        {punishItems(message.author.id, guildId, message)}
                     </Menu.Menu>
                 ))
             };
