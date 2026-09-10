@@ -102,8 +102,10 @@ Write-Note "pnpm   $(& pnpm --version)"
 Write-Step "Locating the plugins"
 
 if (-not $Plugins) {
-    $candidate = Split-Path -Parent $PSScriptRoot
-    if (Test-Path (Join-Path (Join-Path $candidate "ModToolDiscord") "index.tsx")) {
+    # $PSScriptRoot is empty when the script is piped straight into iex, so fall back to cloning
+    $candidate = if ($PSScriptRoot) { Split-Path -Parent $PSScriptRoot } else { $null }
+
+    if ($candidate -and (Test-Path (Join-Path (Join-Path $candidate "ModToolDiscord") "index.tsx"))) {
         $Plugins = $candidate
     } else {
         $Plugins = Join-Path $env:USERPROFILE "VencordPlugins"

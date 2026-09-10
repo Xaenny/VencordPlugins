@@ -111,16 +111,23 @@ Removes the Nitro **gift button** from the chat input bar.
 Download **`VencordPluginsInstaller.exe`** from the
 [latest release](https://github.com/Xaenny/VencordPlugins/releases/latest) and run it.
 
-It checks your prerequisites, installs pnpm if needed, clones Vencord, installs its dependencies,
-copies these plugins into `src\userplugins`, builds a dev build, then **asks which Discord to
-patch** — only offering the versions actually installed on your machine — and patches it.
+It follows the [official Vencord source install](https://docs.vencord.dev/installing/) step by
+step, and adds the plugins in the one place they fit — after the dependencies, before the build:
+
+1. Checks `git --version`, `node --version` and `pnpm --version` (installing pnpm through corepack if it's missing)
+2. `git clone https://github.com/Vendicated/Vencord`
+3. `pnpm install --frozen-lockfile`
+4. Creates `src\userplugins` if it isn't there, and copies the plugins in
+5. `pnpm build --dev`
+6. **Asks which Discord to patch** — only offering the versions actually installed — then `pnpm inject`
 
 You need [Git](https://git-scm.com/download/win) and [Node.js 22 or newer](https://nodejs.org)
-installed first; the installer tells you if either is missing. Close Discord when it asks.
+first; the installer says so if either is missing. Close Discord when it asks.
 
-Then start Discord and enable the plugins in **Vencord Settings → Plugins**.
+Then start Discord and enable the plugins in **Vencord Settings → Plugins**. Run it again any time
+to update Vencord and the plugins.
 
-Options, if you run it from a terminal:
+Options, from a terminal:
 
 ```
 VencordPluginsInstaller.exe -vencord D:\Vencord   put Vencord somewhere else
@@ -129,8 +136,31 @@ VencordPluginsInstaller.exe -skip-inject          build only, Discord already pa
 VencordPluginsInstaller.exe -y                    never prompt (needs -branch)
 ```
 
-It is not code-signed, so Windows SmartScreen may warn the first time. The source is
-[`installer/main.go`](installer/main.go) and each release is built from it by GitHub Actions.
+#### About the Windows warning
+
+Windows shows *"Windows protected your PC"* for any executable it hasn't seen before. That isn't
+something the code can fix — SmartScreen goes by code signing and download reputation:
+
+| | |
+|---|---|
+| **EV code-signing certificate** (~$300–500/year, on a hardware token) | trusted immediately, no warning |
+| **Standard OV certificate** (~$100–200/year) | still warns until the file builds up reputation |
+| **Self-signed certificate** | doesn't help at all — Windows treats it as unknown either way |
+
+So, two options in the meantime:
+
+- Click **More info → Run anyway**. Each release publishes `VencordPluginsInstaller.exe.sha256`,
+  so you can confirm the download is the binary GitHub Actions built:
+  ```powershell
+  Get-FileHash .\VencordPluginsInstaller.exe -Algorithm SHA256
+  ```
+- Or skip the exe. This does the same thing and SmartScreen doesn't gate it:
+  ```powershell
+  irm https://raw.githubusercontent.com/Xaenny/VencordPlugins/master/scripts/install.ps1 | iex
+  ```
+
+If you'd rather have the warning gone properly, buy a certificate and signing is a few lines in the
+release workflow.
 
 ### PowerShell script
 
