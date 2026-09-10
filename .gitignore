@@ -7,3 +7,4 @@ RELEASE_NOTES*.md
 
 # built installer
 VencordPluginsInstaller.exe
+VencordPluginsInstaller.exe.sha256
