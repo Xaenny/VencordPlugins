@@ -37,6 +37,11 @@ start, and `REVISION` in `FavoriteMedia/index.tsx` must be bumped whenever that 
 
 ## How this repo reaches Vencord
 
+`scripts/install.ps1` (via `install.bat`) sets up Vencord, the plugins and a dev build from
+scratch, and updates all of it when re-run. `scripts/sync-to-vencord.ps1` does just the
+copy-and-build half. Both were executed for real against a Vencord checkout, not only written.
+
+
 Plugins must be **copied** into `src\userplugins`. Junctions and symlinks break the build:
 esbuild resolves them to their real path outside the Vencord tree, and `@api/*`, `@utils/*` and
 `@webpack/*` stop resolving. Junctioning the whole repo is worse — Vencord imports every entry in

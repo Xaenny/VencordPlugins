@@ -35,7 +35,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repo = Split-Path -Parent $PSScriptRoot
-$dest = Join-Path $Vencord "src\userplugins"
+$dest = Join-Path (Join-Path $Vencord "src") "userplugins"
 
 if (-not (Test-Path (Join-Path $Vencord "package.json"))) {
     throw "No Vencord checkout at '$Vencord' (package.json not found). Pass -Vencord <path>."
@@ -92,7 +92,8 @@ $plugins = Get-ChildItem -Path $repo -Directory | Where-Object {
 
 if (-not $plugins) { throw "No plugin folders found in '$repo'." }
 
-$backupRoot = Join-Path $env:LOCALAPPDATA "VencordPluginBackups\$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+$backupBase = if ($env:LOCALAPPDATA) { $env:LOCALAPPDATA } else { [System.IO.Path]::GetTempPath() }
+$backupRoot = Join-Path (Join-Path $backupBase "VencordPluginBackups") (Get-Date -Format "yyyyMMdd-HHmmss")
 $copied = @()
 
 Write-Host "Syncing $($plugins.Count) plugin(s) from $repo"
