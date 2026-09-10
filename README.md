@@ -106,7 +106,55 @@ Removes the Nitro **gift button** from the chat input bar.
 
 ## Installation
 
-1. Clone this repo or copy the plugin folders into your Vencord `src/userplugins/` directory:
+### One command (recommended)
+
+Sets up Vencord, these plugins and a dev build from scratch — and updates all three when run again.
+
+1. Install [Git](https://git-scm.com/download/win) and [Node.js 22 or newer](https://nodejs.org) if you don't have them.
+2. Clone this repo and run the installer:
+   ```powershell
+   git clone https://github.com/Xaenny/VencordPlugins
+   cd VencordPlugins
+   .\install.bat
+   ```
+   (or double-click `install.bat`)
+
+It checks your prerequisites, installs pnpm if needed, clones Vencord to `%USERPROFILE%\Vencord`,
+installs its dependencies, copies the plugins into `src\userplugins`, builds a dev build, and runs
+the Vencord installer so you can patch Discord. Pick the Discord you actually use (Stable / PTB /
+Canary) when it asks, and close Discord first.
+
+Then restart Discord fully and enable the plugins in **Vencord Settings → Plugins**.
+
+Options:
+
+```powershell
+.\install.bat -Vencord D:\Vencord   # put Vencord somewhere else
+.\install.bat -SkipInject           # build only, Discord already patched
+```
+
+### Updating
+
+Run the same command again — it pulls both repos, rebuilds, and leaves your Discord patch alone:
+
+```powershell
+.\install.bat -SkipInject
+```
+
+To update only the plugins in an existing Vencord checkout:
+
+```powershell
+git pull
+.\scripts\sync-to-vencord.ps1 -Vencord C:\path\to\Vencord -Build
+```
+
+The sync script pulls this repo first and prints the commit it copied from, so a stale checkout is
+obvious. It backs up any destination folder that differs before replacing it, so edits made in the
+wrong place are never lost silently.
+
+### By hand
+
+1. Copy the plugin folders into your Vencord `src/userplugins/` directory:
    ```
    Vencord/
    └── src/
@@ -119,21 +167,12 @@ Removes the Nitro **gift button** from the chat input bar.
            └── HideGiftButton/
    ```
 
-   Vencord builds from `src/userplugins`, so the folders have to be **copied** in — junctions and
-   symlinks don't work, because esbuild resolves them to their real path outside the Vencord tree
-   and the `@api`/`@utils`/`@webpack` aliases stop resolving.
+   They must be **copied**. Junctions and symlinks break the build: esbuild resolves them to their
+   real path outside the Vencord tree, and the `@api`/`@utils`/`@webpack` aliases stop resolving.
 
-   To copy them in (and avoid the repo and the copies drifting apart), run from this repo:
+2. From your Vencord folder, build and inject:
    ```powershell
-   git pull
-   .\scripts\sync-to-vencord.ps1 -Vencord C:\path\to\Vencord -Build
-   ```
-   It treats this repo as the source of truth and backs up any destination folder that differs
-   before replacing it, so edits made in the wrong place are never lost silently.
-
-2. Or, from your Vencord folder, build and inject by hand:
-   ```powershell
-   pnpm build
+   pnpm build --dev
    pnpm inject
    ```
 
