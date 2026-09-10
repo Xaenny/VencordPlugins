@@ -152,28 +152,69 @@ func run(vencordPath, pluginsPath, branchName string, skipInject, assumeYes bool
 	}
 
 	step("Patching Discord")
-	branch, err := chooseBranch(branchName, assumeYes)
+	install, err := chooseBranch(branchName, assumeYes)
 	if err != nil {
 		return err
 	}
 
-	warn("close %s before continuing - it can't be patched while running", branch.label)
+	// A patch interrupted between the rename and the write leaves the backup but no app.asar.
+	// Vencord's patcher then tries to unpatch first and dies on the missing file, so put the
+	// backup back before handing over - that is the same restore its own unpatch would do.
+	if install.state == asarBroken {
+		warn("%s has a half-finished patch: app.asar is missing, only the _app.asar backup is there", install.branch.label)
+		info("in %s", install.resources)
+
+		if assumeYes || strings.EqualFold(prompt(dim("     restore the backup and carry on? [Y/n] ")), "n") {
+			if assumeYes {
+				return errors.New("this install needs repairing first - run without -y, or restore _app.asar to app.asar yourself")
+			}
+			return errors.New("left the install as it is - patching would fail against it")
+		}
+
+		if err := install.repair(); err != nil {
+			return err
+		}
+		ok("restored app.asar from the backup")
+	}
+
+	warn("close %s before continuing - it can't be patched while running", install.branch.label)
 	if !assumeYes {
 		prompt(dim("     press Enter once it's closed... "))
 	}
 
 	// pnpm inject is "node scripts/runInstaller.mjs -- --install"; everything after the -- is
 	// handed to Vencord's own installer, which takes --branch.
-	running("pnpm inject --branch " + branch.flag)
-	if err := runIn(vencordPath, "node", "scripts/runInstaller.mjs", "--", "--install", "--branch", branch.flag); err != nil {
-		return fmt.Errorf("patching %s: %w", branch.label, err)
+	running("pnpm inject --branch " + install.branch.flag)
+	if err := runIn(vencordPath, "node", "scripts/runInstaller.mjs", "--", "--install", "--branch", install.branch.flag); err != nil {
+		explainInjectFailure(install)
+		return fmt.Errorf("patching %s: %w", install.branch.label, err)
 	}
 
-	done(branch.label + " is patched")
+	done(install.branch.label + " is patched")
 	fmt.Println()
-	info("start %s, then turn the plugins on in Vencord Settings > Plugins", branch.label)
+	info("start %s, then turn the plugins on in Vencord Settings > Plugins", install.branch.label)
 	info("run this again any time to update Vencord and the plugins")
 	return nil
+}
+
+// explainInjectFailure turns Vencord's patcher error into the two things that actually cause it.
+func explainInjectFailure(install discordInstall) {
+	fmt.Println()
+	warn("the Vencord installer couldn't patch %s", install.branch.label)
+
+	info("if it said the file is in use: %s is still running - close it from the tray, or end", install.branch.label)
+	info("its tasks in Task Manager, then run this again")
+
+	if install.resources != "" {
+		state := inspectAsar(install.resources)
+		switch state {
+		case asarBroken:
+			info("if it said a file was not found: the patch is half-applied - rename _app.asar back")
+			info("to app.asar in %s, then run this again", install.resources)
+		case asarUnknown:
+			info("%s has neither app.asar nor _app.asar - reinstall Discord to restore it", install.resources)
+		}
+	}
 }
 
 // ensureDir creates a folder if it isn't there, reporting whether it had to.
@@ -389,37 +430,45 @@ func copyDir(source, target string) error {
 
 // --- Discord ------------------------------------------------------------------------------
 
-func chooseBranch(requested string, assumeYes bool) (discordBranch, error) {
+func chooseBranch(requested string, assumeYes bool) (discordInstall, error) {
+	installed := installedDiscords()
+
 	if requested != "" {
 		for _, branch := range branches {
 			if strings.EqualFold(requested, branch.flag) {
-				return branch, nil
+				for _, install := range installed {
+					if install.branch.flag == branch.flag {
+						return install, nil
+					}
+				}
+				return discordInstall{branch: branch}, nil
 			}
 		}
-		return discordBranch{}, fmt.Errorf("unknown branch %q - use stable, ptb or canary", requested)
+		return discordInstall{}, fmt.Errorf("unknown branch %q - use stable, ptb or canary", requested)
 	}
 
-	installed := installedBranches()
 	if len(installed) == 1 {
-		ok("only %s is installed - using that", installed[0].label)
+		ok("only %s is installed - using that", installed[0].branch.label)
 		return installed[0], nil
 	}
 
 	if assumeYes {
-		return discordBranch{}, errors.New("several Discord versions are installed - pass -branch stable|ptb|canary")
+		return discordInstall{}, errors.New("several Discord versions are installed - pass -branch stable|ptb|canary")
 	}
 
 	// Offer everything when detection found nothing, rather than refusing to continue
 	choices := installed
 	if len(choices) == 0 {
 		warn("couldn't detect your Discord installs - listing all of them")
-		choices = branches
+		for _, branch := range branches {
+			choices = append(choices, discordInstall{branch: branch})
+		}
 	}
 
 	fmt.Println()
 	fmt.Printf("   %s\n", bold("Which Discord should be patched?"))
-	for i, branch := range choices {
-		fmt.Printf("     %s %s\n", cyan(fmt.Sprintf("%d)", i+1)), branch.label)
+	for i, install := range choices {
+		fmt.Printf("     %s %s\n", cyan(fmt.Sprintf("%d)", i+1)), install.describe())
 	}
 	fmt.Println()
 
@@ -432,17 +481,17 @@ func chooseBranch(requested string, assumeYes bool) (discordBranch, error) {
 	}
 }
 
-// installedBranches reports the Discord versions actually present, so the menu only offers real ones.
-func installedBranches() []discordBranch {
+// installedDiscords reports the Discord versions actually present, with the state of each.
+func installedDiscords() []discordInstall {
 	base := os.Getenv("LOCALAPPDATA")
 	if base == "" || runtime.GOOS != "windows" {
 		return nil
 	}
 
-	var found []discordBranch
+	var found []discordInstall
 	for _, branch := range branches {
-		if info, err := os.Stat(filepath.Join(base, branch.dir)); err == nil && info.IsDir() {
-			found = append(found, branch)
+		if install, present := inspectInstall(branch, filepath.Join(base, branch.dir)); present {
+			found = append(found, install)
 		}
 	}
 

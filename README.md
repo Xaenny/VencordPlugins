@@ -119,7 +119,13 @@ step, and adds the plugins in the one place they fit — after the dependencies,
 3. `pnpm install --frozen-lockfile`
 4. Creates `src\userplugins` if it isn't there, and copies the plugins in
 5. `pnpm build --dev`
-6. **Asks which Discord to patch** — only offering the versions actually installed — then `pnpm inject`
+6. **Asks which Discord to patch** — listing only the versions actually installed, with each one's
+   app version and patch state — then `pnpm inject`
+
+If an install has a half-finished patch (Vencord renames `app.asar` to `_app.asar` before writing
+its own; interrupt it in between and the backup is left without an `app.asar`), the installer spots
+it and offers to put the backup back. Vencord's own patcher can't get past that state — it tries to
+unpatch first and fails on the missing file.
 
 You need [Git](https://git-scm.com/download/win) and [Node.js 22 or newer](https://nodejs.org)
 first; the installer says so if either is missing. Close Discord when it asks.
