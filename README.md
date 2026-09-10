@@ -104,6 +104,7 @@ Removes the Nitro **gift button** from the chat input bar.
 
    To copy them in (and avoid the repo and the copies drifting apart), run from this repo:
    ```powershell
+   git pull
    .\scripts\sync-to-vencord.ps1 -Vencord C:\path\to\Vencord -Build
    ```
    It treats this repo as the source of truth and backs up any destination folder that differs

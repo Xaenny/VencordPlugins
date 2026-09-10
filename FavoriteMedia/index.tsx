@@ -25,6 +25,9 @@ import { getThumbnailUrl, isMediaItem, logger } from "./utils";
 export const EmbedContext = proxyLazyWebpack(() => React.createContext<null | FullEmbed>(null));
 export const EmbedMosaicContext = proxyLazyWebpack(() => React.createContext<null | number>(null));
 
+// Bumped whenever this plugin changes, so the console says which build is actually loaded
+const REVISION = "2026-09-10 media-accessory";
+
 const ButtonWrapperClasses = findCssClassesLazy("button", "buttonWrapper", "notificationDot");
 const ChannelTextAreaClasses = findCssClassesLazy("buttonContainer", "channelTextArea", "button");
 
@@ -161,6 +164,8 @@ export default definePlugin({
     start() {
         // Discord renames its minified internals on every client update. Log what this build could
         // still find, so a stale lookup shows up here instead of as a mystery crash.
+        logger.info(`Starting revision ${REVISION}`);
+
         const found = lookupSelfCheck();
         const missing = Object.entries(found).filter(([, ok]) => !ok).map(([name]) => name);
 

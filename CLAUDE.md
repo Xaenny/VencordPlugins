@@ -10,12 +10,18 @@ and a change that isn't copied into Vencord never reaches Discord:
 
 ```powershell
 cd G:\VencordPlugins
+git pull
 .\scripts\sync-to-vencord.ps1 -Vencord C:\Users\thorb\Vencord -Build
 ```
+
+(The script pulls on its own too, unless `-NoPull` is passed. It prints the commit it syncs
+from - if that is not the commit just pushed, nothing else matters.)
 
 Or the manual equivalent:
 
 ```powershell
+cd G:\VencordPlugins
+git pull
 Copy-Item G:\VencordPlugins\<plugin> C:\Users\thorb\Vencord\src\userplugins\ -Recurse -Force
 cd C:\Users\thorb\Vencord
 pnpm build --dev
@@ -23,6 +29,11 @@ pnpm inject
 ```
 
 Then a full Discord restart. Mention which plugin folders actually changed.
+
+**The pull is the step that gets forgotten, and skipping it looks exactly like "your fix did
+nothing":** the plugins rebuild happily, just from stale source. Before re-diagnosing anything,
+confirm the running build is the new one - FavoriteMedia logs `Starting revision <REVISION>` on
+start, and `REVISION` in `FavoriteMedia/index.tsx` must be bumped whenever that plugin changes.
 
 ## How this repo reaches Vencord
 

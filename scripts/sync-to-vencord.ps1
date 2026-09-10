@@ -19,13 +19,17 @@
 .PARAMETER Build
     Also run "pnpm build --dev" and "pnpm inject" in the Vencord checkout afterwards.
 
+.PARAMETER NoPull
+    Skip "git pull" and sync the repo exactly as it is on disk.
+
 .EXAMPLE
     .\scripts\sync-to-vencord.ps1 -Build
 #>
 [CmdletBinding()]
 param(
     [string] $Vencord = "C:\Users\thorb\Vencord",
-    [switch] $Build
+    [switch] $Build,
+    [switch] $NoPull
 )
 
 $ErrorActionPreference = "Stop"
@@ -48,6 +52,36 @@ function Get-FolderFingerprint {
             "$($_.FullName.Substring($Path.Length)):$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)"
         } | Out-String
 }
+
+# Pull first. Syncing without pulling copies whatever this checkout happens to hold, which looks
+# exactly like "the fix didn't work" - the plugins get rebuilt, just from stale source.
+if (-not $NoPull) {
+    Push-Location $repo
+    try {
+        $branch = (& git rev-parse --abbrev-ref HEAD 2>$null)
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "! $repo is not a git checkout - syncing it as-is" -ForegroundColor Yellow
+        } else {
+            $dirty = @(& git status --porcelain) | Where-Object { $_ }
+            if ($dirty) {
+                Write-Host "! Local changes in $repo - they are kept, but a pull may be refused:" -ForegroundColor Yellow
+                $dirty | ForEach-Object { Write-Host "    $_" -ForegroundColor Yellow }
+            }
+
+            Write-Host "Pulling $branch ..."
+            & git pull --ff-only
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "! git pull failed - syncing the commit already checked out" -ForegroundColor Yellow
+            }
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
+Push-Location $repo
+try { $head = (& git log -1 --oneline 2>$null) } finally { Pop-Location }
+if ($head) { Write-Host "Syncing from: $head" -ForegroundColor Cyan }
 
 New-Item -ItemType Directory -Path $dest -Force | Out-Null
 
@@ -83,7 +117,11 @@ foreach ($plugin in $plugins) {
     $copied += $plugin.Name
 }
 
-if (-not $copied) { Write-Host "Nothing changed." }
+if (-not $copied) { Write-Host "Nothing changed - the copies already match this commit." }
+
+# Stray folders here are built too, and a leftover copy of a plugin can shadow the real one
+Write-Host "`nsrc\userplugins now holds:"
+Get-ChildItem -Path $dest -Directory | ForEach-Object { Write-Host "  $($_.Name)" }
 
 if ($Build) {
     Push-Location $Vencord
