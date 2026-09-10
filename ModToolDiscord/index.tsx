@@ -128,6 +128,19 @@ function punishItems(userId: string, guildId: string | null | undefined): ReactN
     ];
 }
 
+/** Right-click menus get one entry that opens the panel - the actions live in the panel itself. */
+function modToolItem(userId: string, guildId: string | null | undefined) {
+    return (
+        <Menu.MenuItem
+            id="vc-modtool"
+            key="vc-modtool"
+            label="ModTool"
+            icon={ModToolIcon}
+            action={() => openPunishModal(userId, guildId)}
+        />
+    );
+}
+
 /** Guild id for a channel, or null in DMs where there is nothing to moderate. */
 function guildIdOf(channel: Channel | undefined | null) {
     return channel?.guild_id ?? null;
@@ -142,7 +155,7 @@ const messageContextPatch: NavContextMenuPatchCallback = (children, props: { mes
 
     children.push(
         <Menu.MenuGroup key="vc-modtool">
-            {punishItems(message.author.id, guildId)}
+            {modToolItem(message.author.id, guildId)}
         </Menu.MenuGroup>
     );
 };
@@ -153,7 +166,7 @@ const userContextPatch: NavContextMenuPatchCallback = (children, props: { user?:
 
     children.push(
         <Menu.MenuGroup key="vc-modtool">
-            {punishItems(props.user.id, guildId)}
+            {modToolItem(props.user.id, guildId)}
         </Menu.MenuGroup>
     );
 };
