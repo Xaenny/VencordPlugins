@@ -6,8 +6,9 @@
  * See LICENSE in this directory for redistribution terms.
  */
 
+import ErrorBoundary from "@components/ErrorBoundary";
 import { Message, RenderModalProps } from "@vencord/discord-types";
-import { Button, ChannelStore, Checkbox, Modal, openModal, SelectedChannelStore, showToast, TextInput, Toasts, UserStore, useState } from "@webpack/common";
+import { Button, ChannelStore, Modal, openModal, SelectedChannelStore, showToast, TextInput, Toasts, UserStore, useState } from "@webpack/common";
 
 import { ACTIONS, PunishAction } from "./actions";
 import { commandFor, currentReason, currentTime, deleteMessage, forwardMessage, previewCommand, sendPunishment } from "./punish";
@@ -37,6 +38,15 @@ function Chips({ values, active, onPick }: { values: string[]; active: string; o
                 </button>
             ))}
         </div>
+    );
+}
+
+function CheckRow({ checked, onChange, children }: { checked: boolean; onChange: (value: boolean) => void; children: string; }) {
+    return (
+        <label className="vc-modtool-check">
+            <input type="checkbox" checked={checked} onChange={e => onChange(e.currentTarget.checked)} />
+            <span className="vc-modtool-checkbox-label">{children}</span>
+        </label>
     );
 }
 
@@ -125,6 +135,7 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
             size="md"
             actions={[{ text: "Close", variant: "secondary", onClick: props.onClose }]}
         >
+            <ErrorBoundary>
             <div className="vc-modtool-panel">
                 <section className="vc-modtool-section">
                     <div className="vc-modtool-section-head">
@@ -170,16 +181,15 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
                             <span className="vc-modtool-section-note">Applied after the command is sent</span>
                         </div>
 
-                        <Checkbox
-                            value={shouldForward}
-                            onChange={(_e: unknown, value: boolean) => {
+                        <CheckRow
+                            checked={shouldForward}
+                            onChange={value => {
                                 setShouldForward(value);
                                 settings.store.forwardByDefault = value;
                             }}
-                            size={20}
                         >
-                            <span className="vc-modtool-checkbox-label">Forward the message</span>
-                        </Checkbox>
+                            Forward the message
+                        </CheckRow>
 
                         {shouldForward && (
                             <div className="vc-modtool-channel-picker">
@@ -194,16 +204,15 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
                             </div>
                         )}
 
-                        <Checkbox
-                            value={shouldDelete}
-                            onChange={(_e: unknown, value: boolean) => {
+                        <CheckRow
+                            checked={shouldDelete}
+                            onChange={value => {
                                 setShouldDelete(value);
                                 settings.store.deleteByDefault = value;
                             }}
-                            size={20}
                         >
-                            <span className="vc-modtool-checkbox-label">Delete the message</span>
-                        </Checkbox>
+                            Delete the message
+                        </CheckRow>
 
                         {shouldForward && !forwardChannelId && (
                             <span className="vc-modtool-warning">
@@ -211,6 +220,12 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
                             </span>
                         )}
                     </section>
+                )}
+
+                {!message && (
+                    <span className="vc-modtool-hint">
+                        Open ModTool from a message (right-click the message, not the member) to forward or delete it.
+                    </span>
                 )}
 
                 <section className="vc-modtool-section">
@@ -236,6 +251,7 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
                     {preview && <code className="vc-modtool-preview">{preview}</code>}
                 </section>
             </div>
+            </ErrorBoundary>
         </Modal>
     );
 }

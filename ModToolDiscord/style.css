@@ -241,3 +241,17 @@
     font-size: 12px;
     color: var(--text-warning, #f0b232);
 }
+
+.vc-modtool-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.vc-modtool-check input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--brand-500, #5865f2);
+    cursor: pointer;
+}
