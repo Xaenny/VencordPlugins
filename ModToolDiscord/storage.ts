@@ -16,6 +16,7 @@ export const DEFAULT_REASON_PRESETS = ["spam", "harassment", "rule break", "poli
 
 const PRESETS_KEY = "ModToolDiscord_presets";
 const CHANNELS_KEY = "ModToolDiscord_guildChannels";
+const FORWARD_CHANNELS_KEY = "ModToolDiscord_guildForwardChannels";
 
 export type PresetKind = "times" | "reasons";
 
@@ -28,6 +29,7 @@ export interface Presets {
 // from these caches and written through to disk in the background.
 let presets: Presets = { times: [...DEFAULT_TIME_PRESETS], reasons: [...DEFAULT_REASON_PRESETS] };
 let guildChannels: Record<string, string> = {};
+let guildForwardChannels: Record<string, string> = {};
 
 export function getPresets(): Presets {
     return presets;
@@ -42,6 +44,15 @@ export function getGuildChannels(): Readonly<Record<string, string>> {
     return guildChannels;
 }
 
+/** Where this guild's messages are forwarded to before being deleted. */
+export function getGuildForwardChannel(guildId: string | null | undefined): string | undefined {
+    return guildId ? guildForwardChannels[guildId] : undefined;
+}
+
+export function getGuildForwardChannels(): Readonly<Record<string, string>> {
+    return guildForwardChannels;
+}
+
 export async function loadStorage() {
     try {
         const storedPresets = await DataStore.get<Partial<Presets>>(PRESETS_KEY);
@@ -53,6 +64,7 @@ export async function loadStorage() {
         }
 
         guildChannels = (await DataStore.get<Record<string, string>>(CHANNELS_KEY)) ?? {};
+        guildForwardChannels = (await DataStore.get<Record<string, string>>(FORWARD_CHANNELS_KEY)) ?? {};
     } catch (err) {
         logger.error("Failed to load stored presets/channels", err);
     }
@@ -64,6 +76,11 @@ function savePresets() {
 
 function saveGuildChannels() {
     DataStore.set(CHANNELS_KEY, guildChannels).catch(err => logger.error("Failed to save channels", err));
+}
+
+function saveGuildForwardChannels() {
+    DataStore.set(FORWARD_CHANNELS_KEY, guildForwardChannels)
+        .catch(err => logger.error("Failed to save forward channels", err));
 }
 
 export function addPreset(kind: PresetKind, rawValue: string) {
@@ -88,4 +105,14 @@ export function setGuildChannel(guildId: string, channelId: string | null) {
     }
 
     saveGuildChannels();
+}
+
+export function setGuildForwardChannel(guildId: string, channelId: string | null) {
+    if (channelId) guildForwardChannels = { ...guildForwardChannels, [guildId]: channelId };
+    else {
+        const { [guildId]: _removed, ...rest } = guildForwardChannels;
+        guildForwardChannels = rest;
+    }
+
+    saveGuildForwardChannels();
 }

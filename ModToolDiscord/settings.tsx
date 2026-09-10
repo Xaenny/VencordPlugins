@@ -14,7 +14,7 @@ import { OptionType } from "@utils/types";
 import { Button, ChannelStore, GuildStore, TextInput, useState } from "@webpack/common";
 
 import { ACTIONS } from "./actions";
-import { addPreset, getGuildChannels, getPresets, PresetKind, removePreset, setGuildChannel } from "./storage";
+import { addPreset, getGuildChannels, getGuildForwardChannels, getPresets, PresetKind, removePreset, setGuildChannel, setGuildForwardChannel } from "./storage";
 
 function PresetChips({ kind, placeholder }: { kind: PresetKind; placeholder: string; }) {
     const update = useForceUpdater();
@@ -80,31 +80,42 @@ function ReasonPresetsSetting() {
 
 function GuildChannelsSetting() {
     const update = useForceUpdater();
-    const entries = Object.entries(getGuildChannels());
+    const commandChannels = getGuildChannels();
+    const forwardChannels = getGuildForwardChannels();
+    const entries = [...new Set([...Object.keys(commandChannels), ...Object.keys(forwardChannels)])];
 
     return (
         <section className="vc-modtool-setting">
             <Heading tag="h3">Command channels</Heading>
             <Paragraph className="vc-modtool-hint">
-                Where each server's commands are sent. Set one by right-clicking a channel and picking
-                "Send ModTool commands here".
+                Where each server's commands are sent, and where its messages are forwarded. Set them by
+                right-clicking a channel and picking "Send ModTool commands here" or
+                "Forward ModTool messages here".
             </Paragraph>
             {entries.length === 0
                 ? <span className="vc-modtool-empty">No servers configured yet</span>
                 : (
                     <div className="vc-modtool-channel-list">
-                        {entries.map(([guildId, channelId]) => (
+                        {entries.map(guildId => (
                             <div className="vc-modtool-channel-row" key={guildId}>
                                 <span className="vc-modtool-channel-guild">
                                     {GuildStore.getGuild(guildId)?.name ?? `Server ${guildId}`}
                                 </span>
                                 <span className="vc-modtool-channel-name">
-                                    #{ChannelStore.getChannel(channelId)?.name ?? channelId}
+                                    {commandChannels[guildId]
+                                        ? `commands -> #${ChannelStore.getChannel(commandChannels[guildId])?.name ?? commandChannels[guildId]}`
+                                        : "no command channel"}
+                                    {forwardChannels[guildId] &&
+                                        `, forwards -> #${ChannelStore.getChannel(forwardChannels[guildId])?.name ?? forwardChannels[guildId]}`}
                                 </span>
                                 <Button
                                     size={Button.Sizes.SMALL}
                                     color={Button.Colors.RED}
-                                    onClick={() => { setGuildChannel(guildId, null); update(); }}
+                                    onClick={() => {
+                                        setGuildChannel(guildId, null);
+                                        setGuildForwardChannel(guildId, null);
+                                        update();
+                                    }}
                                 >
                                     Remove
                                 </Button>
@@ -166,6 +177,16 @@ export const settings = definePluginSettings({
         description: "Show a ModTool button on message hover",
         default: true,
         restartNeeded: true
+    },
+    forwardByDefault: {
+        type: OptionType.BOOLEAN,
+        description: "Tick \"Forward the message\" by default in the panel",
+        default: false
+    },
+    deleteByDefault: {
+        type: OptionType.BOOLEAN,
+        description: "Tick \"Delete the message\" by default in the panel",
+        default: false
     },
     showSentToast: {
         type: OptionType.BOOLEAN,

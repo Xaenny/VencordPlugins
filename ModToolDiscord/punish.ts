@@ -7,6 +7,8 @@
  */
 
 import { sendMessage } from "@utils/discord";
+import { Message } from "@vencord/discord-types";
+import { filters, find } from "@webpack";
 import { ChannelStore, showToast, Toasts } from "@webpack/common";
 
 import { buildCommand, PunishAction } from "./actions";
@@ -84,4 +86,71 @@ export async function sendPunishment(request: PunishRequest): Promise<PunishResu
     }
 
     return { ok: true, channelId, content };
+}
+
+/** message_reference.type - 0 is a reply, 1 is a forward (Discord's MessageReferenceType) */
+const MESSAGE_REFERENCE_FORWARD = 1;
+
+interface MessageActions {
+    deleteMessage(channelId: string, messageId: string): void;
+}
+
+let messageActions: MessageActions | null = null;
+let lookedUpMessageActions = false;
+
+/** Resolved without find*Lazy, which throws on dev builds when a lookup goes stale. */
+function getMessageActions(): MessageActions | null {
+    if (!lookedUpMessageActions) {
+        lookedUpMessageActions = true;
+        try {
+            messageActions = find(filters.byProps("deleteMessage", "startEditMessage"), { isIndirect: true }) as MessageActions;
+        } catch (err) {
+            logger.error("Lookup for MessageActions threw", err);
+        }
+
+        if (!messageActions) logger.warn("Couldn't find MessageActions - deleting messages is unavailable");
+    }
+
+    return messageActions;
+}
+
+/**
+ * Forwards a message the way Discord's own forward modal does: an empty message carrying a
+ * message_reference of type FORWARD. Empty content is only allowed for that reference type.
+ */
+export async function forwardMessage(message: Message, targetChannelId: string) {
+    try {
+        await sendMessage(targetChannelId, { content: "" }, false, {
+            messageReference: {
+                type: MESSAGE_REFERENCE_FORWARD,
+                channel_id: message.channel_id,
+                message_id: message.id,
+                guild_id: ChannelStore.getChannel(message.channel_id)?.guild_id
+            }
+        } as any);
+    } catch (err) {
+        logger.error("Failed to forward the message", err);
+        showToast("ModTool: couldn't forward the message", Toasts.Type.FAILURE);
+        return false;
+    }
+
+    return true;
+}
+
+export function deleteMessage(channelId: string, messageId: string) {
+    const actions = getMessageActions();
+    if (!actions) {
+        showToast("ModTool: couldn't delete the message", Toasts.Type.FAILURE);
+        return false;
+    }
+
+    try {
+        actions.deleteMessage(channelId, messageId);
+    } catch (err) {
+        logger.error("Failed to delete the message", err);
+        showToast("ModTool: couldn't delete the message", Toasts.Type.FAILURE);
+        return false;
+    }
+
+    return true;
 }

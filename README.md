@@ -83,6 +83,7 @@ command channel of a standalone mod tool, inside Discord itself.
 - **Presets** for times and reasons, editable in plugin settings and stored for your Discord account
 - **Per-server command channel**, set by right-clicking a channel → *Send ModTool commands here*
 - A **punish panel** for full control — target, time, reason, channel and every action in one place
+- Optional **Forward** and **Delete** tickboxes when opened from a message: the message is forwarded to the server's forward channel *before* it is deleted, and if the forward fails the delete is skipped rather than losing it
 - Command names are configurable, so `.to` / `.ban` can be whatever your bot uses
 - Kick and Ban open the panel first by default, so a destructive action is never a single stray click
 
