@@ -1,5 +1,11 @@
-/* Fallback selectors — dynamic labels are injected at runtime in index.ts */
-[class*="channelTextArea"] button[aria-label="Send a gift" i],
-[class*="channelTextArea"] [class*="button"][aria-label="Send a gift" i] {
+/*
+ * Fallback only - index.ts replaces this with selectors built from Discord's real class names.
+ *
+ * The rightmost compound is a tag on purpose. A rule ending in an attribute selector alone goes in
+ * the browser's universal bucket and is tested against every element on every style recalculation,
+ * which is charged to every hover in the client; it measured ~7x the cost of the rest of the
+ * stylesheet on its own.
+ */
+[class*="channelTextArea"] button[aria-label="Send a gift" i] {
     display: none !important;
 }

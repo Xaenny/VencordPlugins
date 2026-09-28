@@ -9,7 +9,7 @@
 import { definePluginSettings } from "@api/Settings";
 import { managedStyleRootNode } from "@api/Styles";
 import { getIntlMessage } from "@utils/discord";
-import { createAndAppendStyle } from "@utils/css";
+import { classNameToSelector, createAndAppendStyle } from "@utils/css";
 import definePlugin, { OptionType } from "@utils/types";
 import { findCssClassesLazy } from "@webpack";
 
@@ -60,16 +60,27 @@ function updateDynamicStyle() {
         return;
     }
 
-    const channelTextArea = ChannelTextAreaClasses?.channelTextArea ?? "channelTextArea";
-    const buttonClass = ChannelTextAreaClasses?.button ?? "button";
+    // Browsers match selectors right to left and bucket every rule by the rightmost compound. A
+    // rightmost compound with no class, id or tag - `[aria-label="..." i]` - lands in the universal
+    // bucket, which means it is tested against every element in the document on every style
+    // recalculation, and hovering anything causes a style recalculation. Measured in Chromium, the
+    // attribute-only form cost ~7x the recalc time of everything else here put together, so both
+    // selectors below deliberately end in a real class or a tag.
+    //
+    // findCssClassesLazy hands back Discord's actual hashed class, so there is no need to match a
+    // substring of it either - `.${buttonClass}` is exact, and free to match.
+    const channelTextArea = ChannelTextAreaClasses?.channelTextArea;
+    const buttonClass = ChannelTextAreaClasses?.button;
+
+    const scope = channelTextArea ? classNameToSelector(channelTextArea) : '[class*="channelTextArea"]';
 
     const selectors = getGiftAriaLabels().flatMap(label => {
         const escaped = escapeCss(label);
-        return [
-            `[class*="${channelTextArea}"] button[aria-label="${escaped}" i]`,
-            `[class*="${channelTextArea}"] [class*="${buttonClass}"][aria-label="${escaped}" i]`,
-            `[class*="channelTextArea"] [aria-label="${escaped}" i]`
-        ];
+        const rules = [`${scope} button[aria-label="${escaped}" i]`];
+
+        if (buttonClass) rules.push(`${scope} ${classNameToSelector(buttonClass)}[aria-label="${escaped}" i]`);
+
+        return rules;
     });
 
     dynamicStyle.textContent = `${selectors.join(",\n")} { display: none !important; }`;
