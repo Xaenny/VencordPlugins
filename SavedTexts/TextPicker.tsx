@@ -9,10 +9,11 @@ import "./style.css";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { DeleteIcon, PencilIcon } from "@components/Icons";
 import { findCssClassesLazy } from "@webpack";
-import { ExpressionPickerStore, Forms, Modal, openModal, TextArea, TextInput, useCallback, useEffect, useMemo, useRef, useState } from "@webpack/common";
+import { ExpressionPickerStore, Forms, openModal, TextArea, TextInput, useCallback, useEffect, useMemo, useRef, useState } from "@webpack/common";
 import { RenderModalProps } from "@vencord/discord-types";
 
 import { findComponentSafely, lazyResolve, useResizeObserver, useVirtualizedMasonry } from "../FavoriteMedia/utils";
+import { SafeModal } from "./modal";
 import { settings } from "./settings";
 import { addSavedText, getPasteCount, getSavedTexts, incrementPasteCount, makeDefaultName, removeSavedText, SavedText, setPasteCount, updateSavedText } from "./storage";
 
@@ -116,15 +117,10 @@ function EditTextModal({
     const [text, setText] = useState(item?.text ?? initialText ?? "");
 
     return (
-        <Modal
+        <SafeModal
             {...props}
             title={item ? "Edit Saved Text" : "Add Saved Text"}
             actions={[
-                {
-                    text: "Cancel",
-                    variant: "secondary",
-                    onClick: props.onClose
-                },
                 {
                     text: item ? "Save" : "Add",
                     variant: "primary",
@@ -138,6 +134,11 @@ function EditTextModal({
                         onSaved();
                         props.onClose();
                     }
+                },
+                {
+                    text: "Cancel",
+                    variant: "secondary",
+                    onClick: props.onClose
                 }
             ]}
         >
@@ -157,13 +158,17 @@ function EditTextModal({
                     />
                 </div>
             </Forms.FormSection>
-        </Modal>
+        </SafeModal>
     );
 }
 
 export function openEditTextModal(item?: SavedText, onSaved?: () => void, initialText?: string) {
+    // The boundary has to sit outside the modal, not inside it: a stale lookup in the chrome is what
+    // takes the client down rather than just the modal.
     openModal(props => (
-        <EditTextModal {...props} item={item} initialText={initialText} onSaved={() => onSaved?.()} />
+        <ErrorBoundary>
+            <EditTextModal {...props} item={item} initialText={initialText} onSaved={() => onSaved?.()} />
+        </ErrorBoundary>
     ));
 }
 
@@ -178,15 +183,10 @@ function EditPasteCountModal({
     const [count, setCount] = useState(String(getPasteCount(item)));
 
     return (
-        <Modal
+        <SafeModal
             {...props}
             title="Edit Paste Count"
             actions={[
-                {
-                    text: "Cancel",
-                    variant: "secondary",
-                    onClick: props.onClose
-                },
                 {
                     text: "Save",
                     variant: "primary",
@@ -196,6 +196,11 @@ function EditPasteCountModal({
                         onSaved?.();
                         props.onClose();
                     }
+                },
+                {
+                    text: "Cancel",
+                    variant: "secondary",
+                    onClick: props.onClose
                 }
             ]}
         >
@@ -207,13 +212,15 @@ function EditPasteCountModal({
                     placeholder="0"
                 />
             </Forms.FormSection>
-        </Modal>
+        </SafeModal>
     );
 }
 
 function openEditPasteCountModal(item: SavedText, onSaved?: () => void) {
     openModal(props => (
-        <EditPasteCountModal {...props} item={item} onSaved={() => onSaved?.()} />
+        <ErrorBoundary>
+            <EditPasteCountModal {...props} item={item} onSaved={() => onSaved?.()} />
+        </ErrorBoundary>
     ));
 }
 

@@ -8,9 +8,10 @@
 
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Message, RenderModalProps } from "@vencord/discord-types";
-import { Button, ChannelStore, Modal, openModal, SelectedChannelStore, showToast, TextInput, Toasts, UserStore, useState } from "@webpack/common";
+import { Button, ChannelStore, openModal, SelectedChannelStore, showToast, TextInput, Toasts, UserStore, useState } from "@webpack/common";
 
 import { ACTIONS, PunishAction } from "./actions";
+import { SafeModal } from "./modal";
 import { commandFor, currentReason, currentTime, deleteMessage, forwardMessage, previewCommand, sendPunishment } from "./punish";
 import { settings } from "./settings";
 import { getGuildChannel, getGuildForwardChannel, getPresets, setGuildChannel, setGuildForwardChannel } from "./storage";
@@ -128,14 +129,11 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
         : null;
 
     return (
-        <Modal
+        <SafeModal
             {...props}
             title="ModTool"
             subtitle={user ? `Punishing ${user.username}` : undefined}
-            size="md"
-            actions={[{ text: "Close", variant: "secondary", onClick: props.onClose }]}
         >
-            <ErrorBoundary>
             <div className="vc-modtool-panel">
                 <section className="vc-modtool-section">
                     <div className="vc-modtool-section-head">
@@ -251,8 +249,7 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
                     {preview && <code className="vc-modtool-preview">{preview}</code>}
                 </section>
             </div>
-            </ErrorBoundary>
-        </Modal>
+        </SafeModal>
     );
 }
 
@@ -262,7 +259,11 @@ export function openPunishModal(
     action?: PunishAction,
     message?: Message
 ) {
+    // The boundary is outside PunishModal on purpose: it has to cover the modal chrome too, since a
+    // stale lookup in there is exactly what used to take the client down instead of just the panel.
     openModal(props => (
-        <PunishModal {...props} userId={userId} guildId={guildId} action={action} message={message} />
+        <ErrorBoundary>
+            <PunishModal {...props} userId={userId} guildId={guildId} action={action} message={message} />
+        </ErrorBoundary>
     ));
 }

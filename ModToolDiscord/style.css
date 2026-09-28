@@ -1,3 +1,78 @@
+/*
+ * Shared modal styles - see modal.tsx. Byte-identical between plugin folders; edit one, copy across.
+ */
+
+.vc-safemodal-heading {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+}
+
+.vc-safemodal-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--header-primary, #f2f3f5);
+}
+
+.vc-safemodal-subtitle {
+    font-size: 13px;
+    color: var(--text-muted, #949ba4);
+}
+
+/*
+ * Everything below is only reached when Discord's own modal components can't be found. Without them
+ * there is no card around us at all, so this has to draw the whole thing: surface, rounding, and a
+ * scroll region that can't push the buttons off screen.
+ */
+
+.vc-safemodal {
+    display: flex;
+    flex-direction: column;
+    width: min(600px, calc(100vw - 32px));
+    max-height: calc(100vh - 64px);
+    margin: auto;
+    border-radius: 8px;
+    background: var(--modal-background, var(--background-primary, #313338));
+    box-shadow: var(--elevation-high, 0 8px 16px rgb(0 0 0 / 24%));
+    overflow: hidden;
+}
+
+.vc-safemodal-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+}
+
+.vc-safemodal-content {
+    padding: 0 16px;
+    overflow-y: auto;
+}
+
+.vc-safemodal-footer {
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 8px;
+    padding: 16px;
+    background: var(--background-secondary, rgb(0 0 0 / 15%));
+}
+
+.vc-safemodal-x {
+    border: none;
+    background: none;
+    padding: 0 4px;
+    color: var(--interactive-normal, #b5bac1);
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.vc-safemodal-x:hover {
+    color: var(--interactive-hover, #dbdee1);
+}
+
 /* Panel */
 
 .vc-modtool-panel {

@@ -20,7 +20,7 @@
     Also run "pnpm build --dev" and "pnpm inject" in the Vencord checkout afterwards.
 
 .PARAMETER NoPull
-    Skip "git pull" and sync the repo exactly as it is on disk.
+    Skip "git pull" - for both this repo and the Vencord checkout - and sync what is on disk.
 
 .EXAMPLE
     .\scripts\sync-to-vencord.ps1 -Build
@@ -73,6 +73,40 @@ if (-not $NoPull) {
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "! git pull failed - syncing the commit already checked out" -ForegroundColor Yellow
             }
+        }
+    } finally {
+        Pop-Location
+    }
+}
+
+# Vencord itself goes stale the same way, and it is the half nobody thinks to update. Its webpack
+# lookups are rewritten whenever Discord re-minifies its bundle, so an old checkout throws inside a
+# React render - which is a client crash, not a broken plugin. (That is what "Modal" did: Discord
+# dropped the export, and every plugin opening a modal took Discord down until Vencord re-anchored
+# the lookup.) Pulling it here costs a second and is not optional in practice.
+if (-not $NoPull) {
+    Push-Location $Vencord
+    try {
+        if (-not (Test-Path (Join-Path $Vencord ".git"))) {
+            Write-Host "! $Vencord is not a git checkout - leaving it alone" -ForegroundColor Yellow
+        } else {
+            $before = (& git rev-parse HEAD 2>$null)
+
+            Write-Host "Pulling Vencord ..."
+            & git pull --ff-only
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "! git pull failed in $Vencord - building the commit already checked out" -ForegroundColor Yellow
+            } elseif ((& git rev-parse HEAD 2>$null) -ne $before) {
+                # Any move at all, not just a changed lockfile: pnpm refuses to build when package.json
+                # and node_modules disagree, and Vencord bumps its version in package.json alone on
+                # nearly every release. It is a no-op when nothing actually changed.
+                Write-Host "Vencord moved - running pnpm install ..."
+                pnpm install --frozen-lockfile
+                if ($LASTEXITCODE -ne 0) { throw "pnpm install failed in $Vencord" }
+            }
+
+            $vhead = (& git log -1 --oneline 2>$null)
+            if ($vhead) { Write-Host "Vencord at: $vhead" -ForegroundColor Cyan }
         }
     } finally {
         Pop-Location
