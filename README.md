@@ -190,12 +190,17 @@ To update only the plugins in an existing Vencord checkout:
 
 ```powershell
 git pull
-.\scripts\sync-to-vencord.ps1 -Vencord C:\path\to\Vencord -Build
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-to-vencord.ps1 -Vencord C:\path\to\Vencord -Build
 ```
 
+(Windows refuses to run unsigned scripts by default, which is what `-ExecutionPolicy Bypass` is for.
+`Set-ExecutionPolicy -Scope Process` works too, but only until you close that window.)
+
 The sync script pulls this repo first and prints the commit it copied from, so a stale checkout is
-obvious. It backs up any destination folder that differs before replacing it, so edits made in the
-wrong place are never lost silently.
+obvious. It also pulls the Vencord checkout and reinstalls its dependencies when that moves - Vencord
+matches Discord's bundle with webpack lookups that go stale on every client update, and an old
+checkout crashes Discord rather than just misbehaving. It backs up any destination folder that
+differs before replacing it, so edits made in the wrong place are never lost silently.
 
 ### By hand
 

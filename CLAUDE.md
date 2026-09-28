@@ -11,11 +11,18 @@ and a change that isn't copied into Vencord never reaches Discord:
 ```powershell
 cd G:\VencordPlugins
 git pull
-.\scripts\sync-to-vencord.ps1 -Vencord C:\Users\thorb\Vencord -Build
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\sync-to-vencord.ps1 -Vencord C:\Users\thorb\Vencord -Build
 ```
 
 (The script pulls on its own too, unless `-NoPull` is passed. It prints the commit it syncs
-from - if that is not the commit just pushed, nothing else matters.)
+from - if that is not the commit just pushed, nothing else matters. It also pulls the Vencord
+checkout, because Vencord's own webpack lookups go stale with every Discord bundle and a stale
+one throws inside a React render, which is a client crash rather than a broken plugin.)
+
+**Always spell the block with `powershell -NoProfile -ExecutionPolicy Bypass -File`.** Calling
+`.\scripts\sync-to-vencord.ps1` directly is refused on a default machine ("Die Ausführung von
+Skripts auf diesem System ist deaktiviert"), and `Set-ExecutionPolicy -Scope Process` only lasts
+until that window closes, so the next update hits it again.
 
 Or the manual equivalent:
 
