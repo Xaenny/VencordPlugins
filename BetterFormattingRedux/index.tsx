@@ -53,13 +53,17 @@ class ToolbarManager {
         SettingsStore.addChangeListener("plugins.BetterFormattingRedux", this.settingsListener);
 
         this.observer = new MutationObserver(records => {
+            // Hoisted out of the loops on purpose. This runs for every node Discord inserts anywhere
+            // in the client - every tooltip, context submenu and popout - so resolving the class
+            // through the webpack proxy and rebuilding the selector per node was charged to all of
+            // them. It cannot change between records of one batch.
+            const selector = `[class*="${TextareaClasses?.textArea ?? "textArea"}"]`;
+
             for (const record of records) {
                 for (const node of record.addedNodes) {
                     if (!(node instanceof Element)) continue;
-                    const textAreaClass = TextareaClasses?.textArea ?? "textArea";
-                    const textArea = node.matches?.(`[class*="${textAreaClass}"]`)
-                        ? node
-                        : node.querySelector?.(`[class*="${textAreaClass}"]`);
+
+                    const textArea = node.matches(selector) ? node : node.querySelector(selector);
                     if (textArea?.firstElementChild instanceof HTMLDivElement && isMainChannelChat(textArea)) {
                         this.addToolbar(textArea.firstElementChild);
                     }

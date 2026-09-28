@@ -67,7 +67,23 @@ function replaceLoadingLogo(root: ParentNode = document) {
 }
 
 let observer: MutationObserver | null = null;
+let stopTimer: ReturnType<typeof setTimeout> | null = null;
 let settingsListener: (() => void) | null = null;
+
+// The observer below watches every node Discord inserts anywhere in the client, and tooltips,
+// context submenus and popouts are all node insertions - so its cost lands on every hover. The
+// loading logo only exists on the loading screen, so once Discord is up there is nothing left for
+// it to find and it is pure overhead for the rest of the session. Stop it as soon as we know the
+// app has loaded.
+function stopWatching() {
+    observer?.disconnect();
+    observer = null;
+
+    if (stopTimer != null) {
+        clearTimeout(stopTimer);
+        stopTimer = null;
+    }
+}
 
 export default definePlugin({
     name: "CustomLoadingLogo",
@@ -119,13 +135,20 @@ export default definePlugin({
         // Document is itself a Node, so it works as a target either way.
         observer.observe(document.documentElement ?? document, { childList: true, subtree: true });
 
+        // POST_CONNECTION_OPEN is the reliable "we're past the loading screen" signal, but it has
+        // already fired if the plugin is switched on at runtime, so time out as well.
+        stopTimer = setTimeout(stopWatching, 60_000);
+
         settingsListener = () => replaceLoadingLogo();
         SettingsStore.addChangeListener("plugins.CustomLoadingLogo", settingsListener);
     },
 
+    flux: {
+        POST_CONNECTION_OPEN: stopWatching
+    },
+
     stop() {
-        observer?.disconnect();
-        observer = null;
+        stopWatching();
 
         if (settingsListener) {
             SettingsStore.removeChangeListener("plugins.CustomLoadingLogo", settingsListener);
