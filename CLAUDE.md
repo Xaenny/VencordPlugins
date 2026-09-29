@@ -19,6 +19,12 @@ from - if that is not the commit just pushed, nothing else matters. It also pull
 checkout, because Vencord's own webpack lookups go stale with every Discord bundle and a stale
 one throws inside a React render, which is a client crash rather than a broken plugin.)
 
+Add `-Release` to build without `--dev`. Dev builds keep Vencord's tracer live (every webpack
+lookup times itself and logs), hold the full pre-patch source of every patched module, and make a
+stale lookup throw inside a React render rather than degrade. That last one is why `--dev` is the
+default here - it surfaces a stale patch immediately instead of letting it rot - but it is a
+developer's trade, not a user's, so `-Release` exists for when the client just has to be fast.
+
 **Always spell the block with `powershell -NoProfile -ExecutionPolicy Bypass -File`.** Calling
 `.\scripts\sync-to-vencord.ps1` directly is refused on a default machine ("Die Ausführung von
 Skripts auf diesem System ist deaktiviert"), and `Set-ExecutionPolicy -Scope Process` only lasts

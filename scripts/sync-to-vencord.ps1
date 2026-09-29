@@ -19,6 +19,12 @@
 .PARAMETER Build
     Also run "pnpm build --dev" and "pnpm inject" in the Vencord checkout afterwards.
 
+.PARAMETER Release
+    Build without --dev. Dev builds keep Vencord's tracer live (every webpack lookup times itself
+    and writes to the console), hold on to the full pre-patch source of every patched module, and
+    make a stale lookup throw inside a React render instead of degrading. None of that is wanted
+    unless you are debugging the plugins themselves.
+
 .PARAMETER NoPull
     Skip "git pull" - for both this repo and the Vencord checkout - and sync what is on disk.
 
@@ -29,6 +35,7 @@
 param(
     [string] $Vencord = "C:\Users\thorb\Vencord",
     [switch] $Build,
+    [switch] $Release,
     [switch] $NoPull
 )
 
@@ -161,8 +168,17 @@ Get-ChildItem -Path $dest -Directory | ForEach-Object { Write-Host "  $($_.Name)
 if ($Build) {
     Push-Location $Vencord
     try {
-        pnpm build --dev
-        if ($LASTEXITCODE -ne 0) { throw "pnpm build --dev failed" }
+        # Spelled out rather than splatted: splatting a one-element array unrolls the string into
+        # its characters, so a -Release build would run "pnpm b u i l d".
+        if ($Release) {
+            Write-Host "Running pnpm build ..."
+            pnpm build
+            if ($LASTEXITCODE -ne 0) { throw "pnpm build failed" }
+        } else {
+            Write-Host "Running pnpm build --dev ..."
+            pnpm build --dev
+            if ($LASTEXITCODE -ne 0) { throw "pnpm build --dev failed" }
+        }
 
         pnpm inject
         if ($LASTEXITCODE -ne 0) { throw "pnpm inject failed" }
