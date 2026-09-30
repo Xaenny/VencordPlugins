@@ -80,8 +80,16 @@ made every message containing an image crash Discord.
 
 ## Verifying a patch against the real Discord build
 
-Patches can be checked without touching Discord: `curl https://ptb.discord.com/app`, pull the
-`/assets/*.js` chunks it lists (`web.*.js` holds most module code), split them on webpack module
-headers, then test each `find`/`match` regex and confirm the patched module still parses.
-`find` iterates modules in ascending id order, so the lowest matching id wins — check that the
-intended module is the first match, not just a match.
+`node scripts/verify-patches.mjs [ptb|stable|canary]` does this for every patch in the repo. It
+reads the patches out of the plugin sources (so it cannot drift from what ships), downloads the
+chunks the app actually loads, splits them on webpack module headers, and prints the module each
+`find` selects and whether the `match` still hits it. Exit code is non-zero if anything is broken.
+**Run it after every Discord or Vencord update, before re-diagnosing anything.**
+
+Two things it knows that are easy to get wrong by hand:
+
+- `find` iterates modules in ascending id order, so the **lowest** matching id wins. The intended
+  module has to be the first match, not just a match.
+- Some of our patches match on text *Vencord* injects (`Vencord.Api.ChatButtons._injectButtons`),
+  which does not exist in Discord's bundle. Vencord's own patch has to be applied to the module
+  first or ours looks broken when it isn't.

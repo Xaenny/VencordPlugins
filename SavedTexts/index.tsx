@@ -17,8 +17,8 @@ import { Logger } from "@utils/Logger";
 import definePlugin, { IconComponent } from "@utils/types";
 import { Message } from "@vencord/discord-types";
 import { findCssClassesLazy } from "@webpack";
-import { ExpressionPickerStore, Menu, ReactNode } from "@webpack/common";
-import { ComponentType } from "react";
+import { ExpressionPickerStore, Menu } from "@webpack/common";
+import { ComponentType, ReactNode } from "react";
 
 import { ExpressionPickerView } from "../FavoriteMedia/types";
 import { settings } from "./settings";

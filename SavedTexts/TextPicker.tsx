@@ -131,7 +131,7 @@ function EditTextModal({
                         } else {
                             await addSavedText(name, text.trim());
                         }
-                        onSaved();
+                        onSaved?.();
                         props.onClose();
                     }
                 },
@@ -142,11 +142,11 @@ function EditTextModal({
                 }
             ]}
         >
-            <Forms.FormSection>
+            <section>
                 <Forms.FormTitle tag="h5">Name</Forms.FormTitle>
                 <TextInput value={name} onChange={setName} placeholder="Label for this text" />
-            </Forms.FormSection>
-            <Forms.FormSection>
+            </section>
+            <section>
                 <Forms.FormTitle tag="h5">Text</Forms.FormTitle>
                 <div className="vc-saved-texts-editor">
                     <TextArea
@@ -157,7 +157,7 @@ function EditTextModal({
                         rows={14}
                     />
                 </div>
-            </Forms.FormSection>
+            </section>
         </SafeModal>
     );
 }
@@ -204,14 +204,14 @@ function EditPasteCountModal({
                 }
             ]}
         >
-            <Forms.FormSection>
+            <section>
                 <Forms.FormTitle tag="h5">Paste count</Forms.FormTitle>
                 <TextInput
                     value={count}
                     onChange={value => setCount(value.replace(/\D/g, ""))}
                     placeholder="0"
                 />
-            </Forms.FormSection>
+            </section>
         </SafeModal>
     );
 }

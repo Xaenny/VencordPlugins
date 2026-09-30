@@ -10,6 +10,7 @@ import { SettingsStore } from "@api/Settings";
 import { definePluginSettings } from "@api/Settings";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
 import { React } from "@webpack/common";
+import { ComponentType } from "react";
 
 import managedStyle from "./style.css?managed";
 
@@ -66,6 +67,15 @@ function replaceLoadingLogo(root: ParentNode = document) {
     }
 }
 
+interface SpinnerProps {
+    className?: string;
+    onLoadedData?: () => void;
+    [key: string]: unknown;
+}
+
+/** Cached per original component - a fresh wrapper each render would remount the logo every time. */
+const wrappers = new WeakMap<ComponentType<any>, ComponentType<any>>();
+
 let observer: MutationObserver | null = null;
 let stopTimer: ReturnType<typeof setTimeout> | null = null;
 let settingsListener: (() => void) | null = null;
@@ -95,25 +105,51 @@ export default definePlugin({
 
     patches: [
         {
-            find: "_loadingText",
+            // Discord used to build the loading <video> inline on the connecting screen. It now
+            // renders a component of its own that picks mov/mp4/webm sources per theme, so the old
+            // match (createElement("video", ...)) no longer exists anywhere. Swap the component
+            // instead of the element: every prop is left exactly as Discord passed it.
+            find: '"app-spinner"',
             replacement: {
-                match: /(\i)=>\i\.createElement\("video",(\{[^}]+\})\)/,
-                replace: "$1=>$self.renderLoadingLogo($2)"
+                match: /(return\(0,\i\.jsx\)\()(\i\.\i)(,\{ref:)/,
+                replace: "$1$self.loadingLogoComponent($2)$3"
             },
             noWarn: true
         }
     ],
 
-    renderLoadingLogo(videoProps: Record<string, unknown>) {
-        const url = getLogoUrl();
+    /**
+     * Wraps Discord's spinner component. Returns the original untouched when no custom logo is set,
+     * so turning the plugin's URL off leaves the loading screen exactly as Discord ships it.
+     */
+    loadingLogoComponent(Original: ComponentType<any>) {
+        let wrapper = wrappers.get(Original);
+        if (wrapper) return wrapper;
 
-        return React.createElement("img", {
-            ...videoProps,
-            src: url,
-            className: `${String(videoProps.className ?? "")} ${MARK}`.trim(),
-            alt: "",
-            draggable: false
+        // forwardRef because the parent passes ref={this.setVideoRef} and a bare function component
+        // would drop it - it only null-checks the ref before playing the connect sound, but losing
+        // it silently would be a regression.
+        wrapper = React.forwardRef<HTMLImageElement, SpinnerProps>((props, ref) => {
+            const url = getLogoUrl();
+            if (!url) return React.createElement(Original, { ...props, ref });
+
+            // onLoadedData is Discord's "the logo is ready" callback, which unhides the loading
+            // screen. <img> has no such event, so onLoad stands in - and onError calls it too,
+            // because a URL that 404s must not leave the screen waiting forever.
+            return React.createElement("img", {
+                ref,
+                src: url,
+                className: `${props.className ?? ""} ${MARK}`.trim(),
+                alt: "",
+                draggable: false,
+                "data-testid": "app-spinner",
+                onLoad: props.onLoadedData,
+                onError: props.onLoadedData
+            });
         });
+
+        wrappers.set(Original, wrapper);
+        return wrapper;
     },
 
     start() {

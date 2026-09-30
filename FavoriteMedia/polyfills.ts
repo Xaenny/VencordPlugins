@@ -60,26 +60,31 @@ export function uint8ArrayToBase64(arr: Uint8Array): string {
         return arr.toBase64({ alphabet: "base64url", omitPadding: true });
     }
 
-    if ("detached" in arr.buffer && arr.buffer.detached) {
+    // TypeScript's lib now declares toBase64 on Uint8Array itself, so the guard above is exhaustive
+    // to the type checker and everything below it narrows to never. The runtime check is still
+    // needed - the method is only there on new enough engines - so re-widen and carry on.
+    const bytes = arr as Uint8Array;
+
+    if ("detached" in bytes.buffer && bytes.buffer.detached) {
         throw new TypeError("toBase64 called on array backed by detached buffer");
     }
 
     let result = "";
 
     let i = 0;
-    for (; i + 2 < arr.length; i += 3) {
-        const triplet = (arr[i] << 16) + (arr[i + 1] << 8) + arr[i + 2];
+    for (; i + 2 < bytes.length; i += 3) {
+        const triplet = (bytes[i] << 16) + (bytes[i + 1] << 8) + bytes[i + 2];
         result +=
             chars[(triplet >> 18) & 63] +
             chars[(triplet >> 12) & 63] +
             chars[(triplet >> 6) & 63] +
             chars[triplet & 63];
     }
-    if (i + 2 === arr.length) {
-        const triplet = (arr[i] << 16) + (arr[i + 1] << 8);
+    if (i + 2 === bytes.length) {
+        const triplet = (bytes[i] << 16) + (bytes[i + 1] << 8);
         result += chars[(triplet >> 18) & 63] + chars[(triplet >> 12) & 63] + chars[(triplet >> 6) & 63];
-    } else if (i + 1 === arr.length) {
-        const triplet = arr[i] << 16;
+    } else if (i + 1 === bytes.length) {
+        const triplet = bytes[i] << 16;
         result += chars[(triplet >> 18) & 63] + chars[(triplet >> 12) & 63];
     }
 
