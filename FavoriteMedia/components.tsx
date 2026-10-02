@@ -557,6 +557,16 @@ export function VideoPickerItem({ url, src, width, height, layout, onSubmit }: {
                     >
                         <SendIcon size="refresh_sm" color="currentColor" />
                     </button>
+                    {/* Same star as the thumbnail branch below. Without it a video that plays inline
+                        could be favourited from a message but never unfavourited from this tab. */}
+                    <FavoriteButton
+                        className={`${css(Classes, "gifFavoriteButton")} ${cl("image-fav-button")}`}
+                        format={FavouriteItemFormat.VIDEO}
+                        url={url}
+                        src={cleanResolvedSrc}
+                        width={width}
+                        height={height}
+                    />
                 </>
             ) : (
                 <>
