@@ -9,14 +9,14 @@
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
 import definePlugin, { IconComponent } from "@utils/types";
 import { Channel, Message, User } from "@vencord/discord-types";
-import { ChannelStore, ContextMenuApi, Menu, Toasts } from "@webpack/common";
+import { ChannelStore, ContextMenuApi, Menu, showToast } from "@webpack/common";
 import { ReactNode } from "react";
 
 import { ACTIONS, PunishAction } from "./actions";
 import { currentReason, currentTime, sendPunishment } from "./punish";
 import { openPunishModal } from "./PunishModal";
 import { settings } from "./settings";
-import { getGuildChannel, getGuildForwardChannel, getPresets, loadStorage, logger, setGuildChannel, setGuildForwardChannel } from "./storage";
+import { getGuildChannel, getGuildForwardChannel, getPresets, loadStorage, logger, setGuildChannel, setGuildForwardChannel, TOAST } from "./storage";
 import managedStyle from "./style.css?managed";
 
 export const ModToolIcon: IconComponent = ({ height = 24, width = 24, className }) => (
@@ -54,11 +54,7 @@ async function quickPunish(
     if (result.ok || result.reason === "failed") return;
 
     // No channel picked for this server yet - open the panel so it can be chosen right there
-    Toasts.show({
-        message: "ModTool: pick a channel for this server first",
-        id: Toasts.genId(),
-        type: Toasts.Type.MESSAGE
-    });
+    showToast("ModTool: pick a channel for this server first", TOAST.MESSAGE);
     openPunishModal(userId, guildId, action);
 }
 
@@ -185,13 +181,9 @@ const channelContextPatch: NavContextMenuPatchCallback = (children, props: { cha
                 label={isCommandTarget ? "Stop sending ModTool commands here" : "Send ModTool commands here"}
                 action={() => {
                     setGuildChannel(channel.guild_id, isCommandTarget ? null : channel.id);
-                    Toasts.show({
-                        message: isCommandTarget
-                            ? "ModTool: command channel cleared for this server"
-                            : `ModTool: commands for this server now go to #${channel.name}`,
-                        id: Toasts.genId(),
-                        type: Toasts.Type.SUCCESS
-                    });
+                    showToast(isCommandTarget
+                        ? "ModTool: command channel cleared for this server"
+                        : `ModTool: commands for this server now go to #${channel.name}`, TOAST.SUCCESS);
                 }}
             />
             <Menu.MenuItem
@@ -199,13 +191,9 @@ const channelContextPatch: NavContextMenuPatchCallback = (children, props: { cha
                 label={isForwardTarget ? "Stop forwarding ModTool messages here" : "Forward ModTool messages here"}
                 action={() => {
                     setGuildForwardChannel(channel.guild_id, isForwardTarget ? null : channel.id);
-                    Toasts.show({
-                        message: isForwardTarget
-                            ? "ModTool: forward channel cleared for this server"
-                            : `ModTool: messages for this server are forwarded to #${channel.name}`,
-                        id: Toasts.genId(),
-                        type: Toasts.Type.SUCCESS
-                    });
+                    showToast(isForwardTarget
+                        ? "ModTool: forward channel cleared for this server"
+                        : `ModTool: messages for this server are forwarded to #${channel.name}`, TOAST.SUCCESS);
                 }}
             />
         </Menu.MenuGroup>

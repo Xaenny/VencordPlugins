@@ -13,7 +13,7 @@ import { useForceUpdater } from "@utils/react";
 import { PluginNative } from "@utils/types";
 import { Channel } from "@vencord/discord-types";
 import { filters, find } from "@webpack";
-import { Constants, DraftType, FluxDispatcher, MessageActions, PendingReplyStore, PermissionStore, RestAPI, Toasts, UploadAttachmentStore, UploadHandler, UploadManager, useCallback, useEffect, useMemo, useRef, UserSettingsActionCreators, UserSettingsProtoStore, useState, useStateFromStores } from "@webpack/common";
+import { Constants, DraftType, FluxDispatcher, MessageActions, PendingReplyStore, PermissionStore, RestAPI, showToast, UploadAttachmentStore, UploadHandler, UploadManager, useCallback, useEffect, useMemo, useRef, UserSettingsActionCreators, UserSettingsProtoStore, useState, useStateFromStores } from "@webpack/common";
 import { deflateSync, inflateSync } from "fflate";
 import { ComponentType, Key, RefObject } from "react";
 import { JsonValue } from "type-fest";
@@ -26,6 +26,14 @@ const Native = VencordNative.pluginHelpers.FavoriteMedia as PluginNative<typeof 
 export const cl = classNameFactory("vc-favouriteAnything-");
 
 export const logger = new Logger("FavoriteMedia");
+
+/*
+ * Reading a property off Vencord's toast-type object is not safe: on a build where it isn't there,
+ * the read throws a TypeError instead of returning undefined - and both uses below are inside
+ * .catch() handlers, so a failed fetch would have thrown again from its own error path. The values
+ * are plain strings, so use them directly.
+ */
+const TOAST_FAILURE = "failure";
 
 // Discord re-minifies its bundles on every client update, so any webpack lookup can go stale at any
 // time. Vencord's find*Lazy helpers *throw* when that happens (and on dev builds they throw even with
@@ -257,13 +265,13 @@ function applyTitleToFilename(title: string, originalFilename: string) {
 export async function sendAttachment(attachment: FullMessageAttachment, channel: Channel) {
     const { filename, title, description } = attachment;
     const file = await fetchAttachment(attachment).catch(() =>
-        Toasts.show({ message: `Couldn't fetch ${filename}`, id: Toasts.genId(), type: Toasts.Type.FAILURE })
+        showToast(`Couldn't fetch ${filename}`, TOAST_FAILURE)
     );
     if (!file) return;
 
     // Using promptToUpload instead of addFiles directly since it has file size checks with error popups
     await promptToUpload([file], channel, DraftType.ChannelMessage).catch(() =>
-        Toasts.show({ message: `Couldn't upload ${filename}`, id: Toasts.genId(), type: Toasts.Type.FAILURE })
+        showToast(`Couldn't upload ${filename}`, TOAST_FAILURE)
     );
 
     const uploads = [...UploadAttachmentStore.getUploads(channel.id, DraftType.ChannelMessage)];

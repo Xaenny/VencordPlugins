@@ -26,7 +26,7 @@ export const EmbedContext = proxyLazyWebpack(() => React.createContext<null | Fu
 export const EmbedMosaicContext = proxyLazyWebpack(() => React.createContext<null | number>(null));
 
 // Bumped whenever this plugin changes, so the console says which build is actually loaded
-const REVISION = "2026-10-02 video-tab-star";
+const REVISION = "2026-10-03 toast-type-fix";
 
 const ButtonWrapperClasses = findCssClassesLazy("button", "buttonWrapper", "notificationDot");
 const ChannelTextAreaClasses = findCssClassesLazy("buttonContainer", "channelTextArea", "button");

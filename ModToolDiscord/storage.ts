@@ -9,6 +9,22 @@
 import * as DataStore from "@api/DataStore";
 import { Logger } from "@utils/Logger";
 
+/*
+ * Vencord's Toasts.Type is read through @webpack/common, and reading a property off it is not safe:
+ * on a build where that object isn't there, `Toasts.Type.SUCCESS` throws a TypeError rather than
+ * returning undefined. That is not hypothetical - it threw from the success toast *after* a
+ * punishment command had already been sent, which aborted the rest of the handler and left the
+ * panel stuck with the message neither forwarded nor deleted.
+ *
+ * The values are plain strings and have been for as long as the upstream file has existed, so use
+ * them directly. Nothing left to go stale.
+ */
+export const TOAST = {
+    MESSAGE: "message",
+    SUCCESS: "success",
+    FAILURE: "failure"
+} as const;
+
 export const logger = new Logger("ModToolDiscord");
 
 export const DEFAULT_TIME_PRESETS = ["5m", "10m", "1h", "1d", "3d", "1w"];

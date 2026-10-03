@@ -8,13 +8,13 @@
 
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Message, RenderModalProps } from "@vencord/discord-types";
-import { Button, ChannelStore, openModal, SelectedChannelStore, showToast, TextInput, Toasts, UserStore, useState } from "@webpack/common";
+import { Button, ChannelStore, openModal, SelectedChannelStore, showToast, TextInput, UserStore, useState } from "@webpack/common";
 
 import { ACTIONS, PunishAction } from "./actions";
 import { SafeModal } from "./modal";
 import { commandFor, currentReason, currentTime, deleteMessage, forwardMessage, previewCommand, sendPunishment } from "./punish";
 import { settings } from "./settings";
-import { getGuildChannel, getGuildForwardChannel, getPresets, setGuildChannel, setGuildForwardChannel } from "./storage";
+import { getGuildChannel, getGuildForwardChannel, getPresets, logger, setGuildChannel, setGuildForwardChannel, TOAST } from "./storage";
 
 interface PunishModalProps extends RenderModalProps {
     userId: string;
@@ -88,40 +88,47 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
 
         setBusy(true);
 
-        const result = await sendPunishment({
-            action: picked,
-            userId: userId.trim(),
-            guildId,
-            time,
-            reason,
-            channelId: channelId || undefined
-        });
+        // Everything below is wrapped because anything that throws between here and the end used to
+        // leave busy stuck on: the panel froze with every button disabled, and - worse - the message
+        // was neither forwarded nor deleted even though the command had already gone out. A toast
+        // reading a property off a stale Vencord object was enough to cause exactly that.
+        try {
+            const result = await sendPunishment({
+                action: picked,
+                userId: userId.trim(),
+                guildId,
+                time,
+                reason,
+                channelId: channelId || undefined
+            });
 
-        // The command is the primary action - if it didn't go out, leave the message alone
-        if (!result.ok) {
-            setBusy(false);
-            return;
-        }
+            // The command is the primary action - if it didn't go out, leave the message alone
+            if (!result.ok) return;
 
-        // Forward first, so the message is preserved before it is deleted. If forwarding fails the
-        // delete is skipped too, rather than destroying the thing we failed to keep a copy of.
-        let forwarded = true;
-        if (message && shouldForward) {
-            forwarded = forwardChannelId
-                ? await forwardMessage(message, forwardChannelId)
-                : false;
+            // Forward first, so the message is preserved before it is deleted. If forwarding fails
+            // the delete is skipped too, rather than destroying what we failed to keep a copy of.
+            let forwarded = true;
+            if (message && shouldForward) {
+                forwarded = forwardChannelId
+                    ? await forwardMessage(message, forwardChannelId)
+                    : false;
 
-            if (!forwardChannelId) {
-                showToast("ModTool: no forward channel set for this server", Toasts.Type.FAILURE);
+                if (!forwardChannelId) {
+                    showToast("ModTool: no forward channel set for this server", TOAST.FAILURE);
+                }
             }
-        }
 
-        if (message && shouldDelete && forwarded) {
-            deleteMessage(message.channel_id, message.id);
-        }
+            if (message && shouldDelete && forwarded) {
+                deleteMessage(message.channel_id, message.id);
+            }
 
-        setBusy(false);
-        props.onClose();
+            props.onClose();
+        } catch (err) {
+            logger.error("Punishment handler threw", err);
+            showToast("ModTool: something went wrong - check the console", TOAST.FAILURE);
+        } finally {
+            setBusy(false);
+        }
     }
 
     const preview = action

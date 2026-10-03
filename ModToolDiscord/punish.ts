@@ -9,11 +9,11 @@
 import { sendMessage } from "@utils/discord";
 import { Message } from "@vencord/discord-types";
 import { filters, find } from "@webpack";
-import { ChannelStore, showToast, Toasts } from "@webpack/common";
+import { ChannelStore, showToast } from "@webpack/common";
 
 import { buildCommand, PunishAction } from "./actions";
 import { settings } from "./settings";
-import { getGuildChannel, logger } from "./storage";
+import { getGuildChannel, logger, TOAST } from "./storage";
 
 export interface PunishRequest {
     action: PunishAction;
@@ -74,7 +74,7 @@ export async function sendPunishment(request: PunishRequest): Promise<PunishResu
         await sendMessage(channelId, { content });
     } catch (err) {
         logger.error("Failed to send the command", err);
-        showToast(`ModTool: couldn't send ${content}`, Toasts.Type.FAILURE);
+        showToast(`ModTool: couldn't send ${content}`, TOAST.FAILURE);
         return { ok: false, reason: "failed" };
     }
 
@@ -82,7 +82,7 @@ export async function sendPunishment(request: PunishRequest): Promise<PunishResu
 
     if (settings.store.showSentToast) {
         const channelName = ChannelStore.getChannel(channelId)?.name;
-        showToast(`Sent to ${channelName ? "#" + channelName : "the mod channel"}: ${content}`, Toasts.Type.SUCCESS);
+        showToast(`Sent to ${channelName ? "#" + channelName : "the mod channel"}: ${content}`, TOAST.SUCCESS);
     }
 
     return { ok: true, channelId, content };
@@ -130,7 +130,7 @@ export async function forwardMessage(message: Message, targetChannelId: string) 
         } as any);
     } catch (err) {
         logger.error("Failed to forward the message", err);
-        showToast("ModTool: couldn't forward the message", Toasts.Type.FAILURE);
+        showToast("ModTool: couldn't forward the message", TOAST.FAILURE);
         return false;
     }
 
@@ -140,7 +140,7 @@ export async function forwardMessage(message: Message, targetChannelId: string) 
 export function deleteMessage(channelId: string, messageId: string) {
     const actions = getMessageActions();
     if (!actions) {
-        showToast("ModTool: couldn't delete the message", Toasts.Type.FAILURE);
+        showToast("ModTool: couldn't delete the message", TOAST.FAILURE);
         return false;
     }
 
@@ -148,7 +148,7 @@ export function deleteMessage(channelId: string, messageId: string) {
         actions.deleteMessage(channelId, messageId);
     } catch (err) {
         logger.error("Failed to delete the message", err);
-        showToast("ModTool: couldn't delete the message", Toasts.Type.FAILURE);
+        showToast("ModTool: couldn't delete the message", TOAST.FAILURE);
         return false;
     }
 
