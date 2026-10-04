@@ -25,6 +25,25 @@ stale lookup throw inside a React render rather than degrade. That last one is w
 default here - it surfaces a stale patch immediately instead of letting it rot - but it is a
 developer's trade, not a user's, so `-Release` exists for when the client just has to be fast.
 
+A failed Vencord pull is now **fatal** - the script refuses to build rather than printing a warning
+that scrolls past. `-AllowStaleVencord` overrides it. It also prints the version and flags a
+checkout more than 14 days old.
+
+### A stale Vencord checkout is the first suspect for any client crash
+
+Three sessions have been spent reading plugin code when the real fault was a Vencord weeks behind
+Discord. Both of these were fixed upstream *before* they were reported here:
+
+- `findExportedComponent found no module`, filter `['Modal']` - opening **any** plugin's settings
+  took the client down. That is Vencord's own `PluginModal` rendering `Modal` from
+  `@webpack/common`, which was `findExportedComponentLazy("Modal")` until 2026-09-26.
+- `Cannot read properties of undefined (reading 'SUCCESS')` - `Toasts.Type` was removed outright on
+  2026-10-03. Reading a property off a Vencord-resolved object **throws** rather than giving
+  `undefined`, so a toast can abort the handler that called it.
+
+So before touching a plugin: check the `Vencord v… at: <commit>` line the sync script prints. If
+the crash is inside Vencord's own UI (settings, modals, the toolbox), it is not ours to fix.
+
 **Always spell the block with `powershell -NoProfile -ExecutionPolicy Bypass -File`.** Calling
 `.\scripts\sync-to-vencord.ps1` directly is refused on a default machine ("Die Ausführung von
 Skripts auf diesem System ist deaktiviert"), and `Set-ExecutionPolicy -Scope Process` only lasts

@@ -28,6 +28,11 @@
 .PARAMETER NoPull
     Skip "git pull" - for both this repo and the Vencord checkout - and sync what is on disk.
 
+.PARAMETER AllowStaleVencord
+    Build even when the Vencord checkout could not be updated. Off by default: a Vencord weeks
+    behind Discord crashes the client rather than merely misbehaving, and the failure used to be a
+    yellow line that scrolled past.
+
 .EXAMPLE
     .\scripts\sync-to-vencord.ps1 -Build
 #>
@@ -36,7 +41,8 @@ param(
     [string] $Vencord = "C:\Users\thorb\Vencord",
     [switch] $Build,
     [switch] $Release,
-    [switch] $NoPull
+    [switch] $NoPull,
+    [switch] $AllowStaleVencord
 )
 
 $ErrorActionPreference = "Stop"
@@ -88,9 +94,14 @@ if (-not $NoPull) {
 
 # Vencord itself goes stale the same way, and it is the half nobody thinks to update. Its webpack
 # lookups are rewritten whenever Discord re-minifies its bundle, so an old checkout throws inside a
-# React render - which is a client crash, not a broken plugin. (That is what "Modal" did: Discord
-# dropped the export, and every plugin opening a modal took Discord down until Vencord re-anchored
-# the lookup.) Pulling it here costs a second and is not optional in practice.
+# React render - which is a client crash, not a broken plugin.
+#
+# This has now cost three debugging sessions, every one of them spent looking at plugin code while
+# the real fault was a Vencord checkout weeks behind: "Modal" (opening any plugin's settings took
+# the client down) and "Toasts.Type" (a punishment command sent, then the panel froze). Both were
+# fixed upstream before they were reported here. So a failed pull is fatal now rather than a yellow
+# line that scrolls past - pass -AllowStaleVencord if you really do want to build from what is on
+# disk.
 if (-not $NoPull) {
     Push-Location $Vencord
     try {
@@ -98,22 +109,81 @@ if (-not $NoPull) {
             Write-Host "! $Vencord is not a git checkout - leaving it alone" -ForegroundColor Yellow
         } else {
             $before = (& git rev-parse HEAD 2>$null)
+            $branch = (& git rev-parse --abbrev-ref HEAD 2>$null)
 
             Write-Host "Pulling Vencord ..."
             & git pull --ff-only
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "! git pull failed in $Vencord - building the commit already checked out" -ForegroundColor Yellow
+            $pullFailed = $LASTEXITCODE -ne 0
+
+            if ($pullFailed) {
+                Write-Host ""
+                Write-Host "  Vencord could not be updated, and a stale Vencord is a crashing client," -ForegroundColor Red
+                Write-Host "  not a misbehaving plugin. What is wrong:" -ForegroundColor Red
+                Write-Host ""
+
+                if ($branch -eq "HEAD") {
+                    Write-Host "    $Vencord is on a detached HEAD, so there is no branch to pull." -ForegroundColor Yellow
+                    Write-Host "    Fix it with:  git -C `"$Vencord`" checkout main" -ForegroundColor Yellow
+                } else {
+                    # Order matters: divergence is the precise diagnosis, and untracked files never
+                    # block a fast-forward, so only tracked modifications count as "local changes".
+                    $counts = (& git rev-list --left-right --count "HEAD...@{upstream}" 2>$null)
+                    $ahead = 0; $behind = 0
+                    if ($counts -match '^(\d+)\s+(\d+)$') { $ahead = [int]$Matches[1]; $behind = [int]$Matches[2] }
+
+                    $dirty = @(& git status --porcelain --untracked-files=no) | Where-Object { $_ }
+
+                    if ($ahead -gt 0) {
+                        Write-Host "    '$branch' has $ahead local commit(s) the remote does not have, and is $behind behind." -ForegroundColor Yellow
+                        Write-Host "    Nothing here needs local commits in Vencord, so the fix is to throw them away:" -ForegroundColor Yellow
+                        Write-Host "      git -C `"$Vencord`" fetch origin main" -ForegroundColor Yellow
+                        Write-Host "      git -C `"$Vencord`" reset --hard origin/main" -ForegroundColor Yellow
+                    } elseif ($dirty) {
+                        Write-Host "    $Vencord has edited tracked files, so a fast-forward is refused:" -ForegroundColor Yellow
+                        $dirty | Select-Object -First 10 | ForEach-Object { Write-Host "      $_" -ForegroundColor Yellow }
+                        Write-Host "    Fix it with:  git -C `"$Vencord`" checkout -- ." -ForegroundColor Yellow
+                    } else {
+                        Write-Host "    The fetch itself failed - check the network, then run it by hand:" -ForegroundColor Yellow
+                        Write-Host "      git -C `"$Vencord`" pull --ff-only" -ForegroundColor Yellow
+                    }
+                }
+                Write-Host ""
+
+                if (-not $AllowStaleVencord) {
+                    throw "Refusing to build against a Vencord checkout that could not be updated. Fix the above, or pass -AllowStaleVencord."
+                }
+                Write-Host "! -AllowStaleVencord given - building from what is on disk anyway" -ForegroundColor Yellow
             } elseif ((& git rev-parse HEAD 2>$null) -ne $before) {
                 # Any move at all, not just a changed lockfile: pnpm refuses to build when package.json
                 # and node_modules disagree, and Vencord bumps its version in package.json alone on
                 # nearly every release. It is a no-op when nothing actually changed.
-                Write-Host "Vencord moved - running pnpm install ..."
+                Write-Host "Vencord moved - running pnpm install ..." -ForegroundColor Cyan
                 pnpm install --frozen-lockfile
                 if ($LASTEXITCODE -ne 0) { throw "pnpm install failed in $Vencord" }
             }
 
+            # Print the version and the age, because a commit hash alone tells you nothing about
+            # whether the checkout is current.
             $vhead = (& git log -1 --oneline 2>$null)
-            if ($vhead) { Write-Host "Vencord at: $vhead" -ForegroundColor Cyan }
+            $vdate = (& git log -1 --format=%cI 2>$null)
+            $vversion = $null
+            $pkg = Join-Path $Vencord "package.json"
+            # Best effort only - a half-written or hand-edited package.json must not take the sync
+            # down on its way to reporting a version number.
+            if (Test-Path $pkg) {
+                try { $vversion = (Get-Content $pkg -Raw | ConvertFrom-Json).version } catch { $vversion = $null }
+            }
+
+            $age = $null
+            if ($vdate) { $age = [int]((Get-Date) - [datetimeoffset]::Parse($vdate).LocalDateTime).TotalDays }
+
+            $label = "Vencord at: $vhead"
+            if ($vversion) { $label = "Vencord v$vversion at: $vhead" }
+            Write-Host $label -ForegroundColor Cyan
+
+            if ($age -ne $null -and $age -gt 14) {
+                Write-Host "! That commit is $age days old. Vencord tracks Discord's bundle; this is where client crashes come from." -ForegroundColor Red
+            }
         }
     } finally {
         Pop-Location
