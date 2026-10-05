@@ -29,14 +29,29 @@ A failed Vencord pull is now **fatal** - the script refuses to build rather than
 that scrolls past. `-AllowStaleVencord` overrides it. It also prints the version and flags a
 checkout more than 14 days old.
 
+### `scripts/doctor.ps1` - run this before diagnosing anything
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\doctor.ps1
+```
+
+Prints the repo commit, the Vencord checkout's version/branch/commit/age/build time, and - the part
+that kept being assumed rather than checked - **which Vencord each Discord install is patched to**.
+Rebuilding a checkout only reaches Discord if that Discord points at it: patch Stable and run PTB,
+or leave an older checkout patched, and every rebuild succeeds while the client loads something
+else. The script reads the path out of each patched `app.asar` and compares it, so that is visible
+rather than inferred.
+
 ### A stale Vencord checkout is the first suspect for any client crash
 
 Three sessions have been spent reading plugin code when the real fault was a Vencord weeks behind
 Discord. Both of these were fixed upstream *before* they were reported here:
 
-- `findExportedComponent found no module`, filter `['Modal']` - opening **any** plugin's settings
-  took the client down. That is Vencord's own `PluginModal` rendering `Modal` from
-  `@webpack/common`, which was `findExportedComponentLazy("Modal")` until 2026-09-26.
+- `findExportedComponent found no module` - opening **any** plugin's settings took the client down.
+  That is Vencord's own `PluginModal` rendering `Modal` from `@webpack/common`, which was
+  `findExportedComponentLazy("Modal")` until 2026-09-26. **Current Vencord contains no
+  `findExportedComponentLazy` call at all**, so this error is proof on its own that the running
+  build is old - whatever the checkout on disk says.
 - `Cannot read properties of undefined (reading 'SUCCESS')` - `Toasts.Type` was removed outright on
   2026-10-03. Reading a property off a Vencord-resolved object **throws** rather than giving
   `undefined`, so a toast can abort the handler that called it.
