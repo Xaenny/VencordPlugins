@@ -59,6 +59,32 @@ Discord. Both of these were fixed upstream *before* they were reported here:
 So before touching a plugin: check the `Vencord v… at: <commit>` line the sync script prints. If
 the crash is inside Vencord's own UI (settings, modals, the toolbox), it is not ours to fix.
 
+#### When Vencord will not update, get git's stderr - do not infer
+
+This cost a week. The checkout sat 45 commits behind while every update attempt reported nothing
+useful, and the cause turned out to be a single local edit to Vencord's `package.json` that made
+`git pull` abort. Five days went on reasoning about *which* Vencord was loaded; one line of git's
+own output settled it.
+
+Vencord's native updater runs git in the folder the client actually loads from, so this asks the
+right folder without needing to know where it is. Paste into Discord's console:
+
+```js
+(async () => {
+  const r = await VencordNative.updater.update();
+  if (r.ok) { console.log("pull returned:", r.value); return; }
+  console.log("message:", r.error?.message);
+  console.log("stderr :", r.error?.stderr);   // git's verbatim reason - this is the answer
+  console.log("stdout :", r.error?.stdout);   // "Updating <from>..<to>" names both commits
+})();
+```
+
+`VencordNative.updater.rebuild()` and `.getUpdates()` are worth knowing for the same reason: they
+separate "git did not move" from "the build did not run" from "the client was not restarted".
+
+If `package.json` keeps going dirty, suspect corepack's auto-pin rewriting the `packageManager`
+field; `COREPACK_ENABLE_AUTO_PIN=0` stops it.
+
 **Always spell the block with `powershell -NoProfile -ExecutionPolicy Bypass -File`.** Calling
 `.\scripts\sync-to-vencord.ps1` directly is refused on a default machine ("Die Ausführung von
 Skripts auf diesem System ist deaktiviert"), and `Set-ExecutionPolicy -Scope Process` only lasts
