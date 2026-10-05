@@ -2,7 +2,9 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -240,5 +242,98 @@ func TestInspectInstallReportsTheNewestVersion(t *testing.T) {
 func TestInspectInstallIgnoresMissingRoots(t *testing.T) {
 	if _, present := inspectInstall(branches[0], filepath.Join(t.TempDir(), "nope")); present {
 		t.Fatal("a missing folder should not report an install")
+	}
+}
+
+// --- pull diagnosis -------------------------------------------------------------------------
+
+func gitIn(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	full := append([]string{"-C", dir}, args...)
+	if out, err := exec.Command("git", full...).CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+// originAndClone builds a real origin repo plus a clone of it, which is the only way to exercise
+// the upstream comparisons diagnosePull makes.
+func originAndClone(t *testing.T) (origin, clone string) {
+	t.Helper()
+	root := t.TempDir()
+	origin = filepath.Join(root, "origin")
+	clone = filepath.Join(root, "clone")
+
+	if err := os.MkdirAll(origin, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, origin, "init", "-q", "-b", "main")
+	gitIn(t, origin, "config", "user.email", "t@t")
+	gitIn(t, origin, "config", "user.name", "t")
+	if err := os.WriteFile(filepath.Join(origin, "file.txt"), []byte("one\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, origin, "add", ".")
+	gitIn(t, origin, "commit", "-qm", "first")
+
+	if out, err := exec.Command("git", "clone", "-q", origin, clone).CombinedOutput(); err != nil {
+		t.Fatalf("clone: %v\n%s", err, out)
+	}
+	gitIn(t, clone, "config", "user.email", "t@t")
+	gitIn(t, clone, "config", "user.name", "t")
+	return origin, clone
+}
+
+func TestDiagnosePullSpotsADetachedHead(t *testing.T) {
+	_, clone := originAndClone(t)
+	gitIn(t, clone, "checkout", "-q", "--detach", "HEAD")
+
+	if got, _ := diagnosePull(clone); got != pullDetached {
+		t.Fatalf("got %v, want pullDetached", got)
+	}
+}
+
+func TestDiagnosePullSpotsADivergedBranch(t *testing.T) {
+	origin, clone := originAndClone(t)
+
+	// the remote moves on, and so does the clone, separately
+	if err := os.WriteFile(filepath.Join(origin, "file.txt"), []byte("two\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, origin, "commit", "-qam", "second")
+	gitIn(t, clone, "commit", "-q", "--allow-empty", "-m", "local only")
+	gitIn(t, clone, "fetch", "-q", "origin")
+
+	if got, _ := diagnosePull(clone); got != pullDiverged {
+		t.Fatalf("got %v, want pullDiverged", got)
+	}
+}
+
+// An edited tracked file is dirty; an untracked one never blocks a fast-forward and must not be
+// reported as the cause. Getting that wrong sent the PowerShell version chasing a stray file.
+func TestDiagnosePullSpotsEditedTrackedFilesButIgnoresUntrackedOnes(t *testing.T) {
+	_, clone := originAndClone(t)
+
+	if err := os.WriteFile(filepath.Join(clone, "untracked.txt"), []byte("junk\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := diagnosePull(clone); got == pullDirty {
+		t.Fatal("an untracked file was reported as blocking the pull")
+	}
+
+	if err := os.WriteFile(filepath.Join(clone, "file.txt"), []byte("edited\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := diagnosePull(clone); got != pullDirty {
+		t.Fatalf("got %v, want pullDirty", got)
+	}
+}
+
+func TestDiagnosePullRemediesNameTheCheckout(t *testing.T) {
+	_, clone := originAndClone(t)
+	gitIn(t, clone, "checkout", "-q", "--detach", "HEAD")
+
+	_, remedy := diagnosePull(clone)
+	if !strings.Contains(remedy, clone) {
+		t.Fatalf("remedy %q does not mention the checkout path", remedy)
 	}
 }

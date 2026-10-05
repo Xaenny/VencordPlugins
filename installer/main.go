@@ -52,11 +52,12 @@ func main() {
 		branchName  = flag.String("branch", "", "Discord to patch: stable, ptb or canary (default: ask)")
 		skipInject  = flag.Bool("skip-inject", false, "Build everything but leave Discord alone")
 		assumeYes   = flag.Bool("y", false, "Never prompt - fails instead of asking")
+		allowStale  = flag.Bool("allow-stale-vencord", false, "Build even if Vencord could not be updated")
 	)
 	flag.Parse()
 	initUI()
 
-	if err := run(*vencordPath, *pluginsPath, *branchName, *skipInject, *assumeYes); err != nil {
+	if err := run(*vencordPath, *pluginsPath, *branchName, *skipInject, *assumeYes, *allowStale); err != nil {
 		fmt.Println()
 		fail("%v", err)
 		waitForExit(*assumeYes)
@@ -66,7 +67,7 @@ func main() {
 	waitForExit(*assumeYes)
 }
 
-func run(vencordPath, pluginsPath, branchName string, skipInject, assumeYes bool) error {
+func run(vencordPath, pluginsPath, branchName string, skipInject, assumeYes, allowStale bool) error {
 	banner()
 
 	if vencordPath == "" {
@@ -81,9 +82,14 @@ func run(vencordPath, pluginsPath, branchName string, skipInject, assumeYes bool
 
 	// 2 - the plugins themselves, which the Vencord docs don't cover
 	step("Getting the plugins")
-	pluginsPath, err := ensureRepo(pluginsPath, pluginsRepoURL, defaultPluginsPath)
+	pluginsPath, pluginsStale, err := ensureRepo(pluginsPath, pluginsRepoURL, defaultPluginsPath)
 	if err != nil {
 		return err
+	}
+	if pluginsStale {
+		problem, remedy := diagnosePull(pluginsPath)
+		warn("couldn't update the plugins - %s", problem)
+		info("the build will use the commit already checked out; fix it with: %s", remedy)
 	}
 	ok("plugins in %s", pluginsPath)
 	if head := gitHead(pluginsPath); head != "" {
@@ -92,8 +98,22 @@ func run(vencordPath, pluginsPath, branchName string, skipInject, assumeYes bool
 
 	// 3 - "git clone https://github.com/Vendicated/Vencord"
 	step("Getting Vencord")
-	if _, err := ensureRepo(vencordPath, vencordRepoURL, func() string { return vencordPath }); err != nil {
+	_, vencordStale, err := ensureRepo(vencordPath, vencordRepoURL, func() string { return vencordPath })
+	if err != nil {
 		return err
+	}
+	if vencordStale {
+		problem, remedy := diagnosePull(vencordPath)
+		warn("couldn't update Vencord - %s", problem)
+		info("fix it with: %s", remedy)
+
+		// Not a warning to scroll past. Vencord's webpack lookups follow Discord's bundle, so a
+		// checkout weeks behind throws inside a React render - a crashing client, not a plugin
+		// that misbehaves. Three debugging sessions went on exactly that.
+		if !allowStale {
+			return fmt.Errorf("refusing to build against a Vencord that could not be updated (pass -allow-stale-vencord to override)")
+		}
+		warn("-allow-stale-vencord given - building from what is on disk anyway")
 	}
 	ok("Vencord in %s", vencordPath)
 	if head := gitHead(vencordPath); head != "" {
@@ -308,8 +328,10 @@ func isPluginRepo(dir string) bool {
 	return err == nil
 }
 
-// ensureRepo clones url into path when it isn't there yet, and pulls when it is.
-func ensureRepo(path, url string, fallback func() string) (string, error) {
+// ensureRepo clones url into path when it isn't there yet, and pulls when it is. The second return
+// value reports whether an existing checkout failed to update - the caller decides how much that
+// matters, because a stale Vencord crashes the client while stale plugins merely lag.
+func ensureRepo(path, url string, fallback func() string) (string, bool, error) {
 	if path == "" {
 		path = fallback()
 	}
@@ -317,21 +339,73 @@ func ensureRepo(path, url string, fallback func() string) (string, error) {
 	if _, err := os.Stat(filepath.Join(path, ".git")); err == nil {
 		info("updating %s", path)
 		if err := runIn(path, "git", "pull", "--ff-only"); err != nil {
-			warn("git pull failed - carrying on with the commit already checked out")
+			return path, true, nil
 		}
-		return path, nil
+		return path, false, nil
 	}
 
 	if entries, err := os.ReadDir(path); err == nil && len(entries) > 0 {
-		return path, fmt.Errorf("%s already exists and isn't a git checkout - move it aside, or pass a different path", path)
+		return path, false, fmt.Errorf("%s already exists and isn't a git checkout - move it aside, or pass a different path", path)
 	}
 
 	info("cloning into %s", path)
 	if err := runIn("", "git", "clone", url, path); err != nil {
-		return path, fmt.Errorf("cloning %s: %w", url, err)
+		return path, false, fmt.Errorf("cloning %s: %w", url, err)
 	}
 
-	return path, nil
+	return path, false, nil
+}
+
+// pullProblem says why "git pull --ff-only" was refused, so the installer can print the fix rather
+// than only the failure.
+type pullProblem int
+
+const (
+	pullDetached pullProblem = iota // no branch to pull
+	pullDiverged                    // local commits the remote does not have
+	pullDirty                       // edited tracked files block the fast-forward
+	pullUnknown                     // the fetch itself failed, or something else
+)
+
+// diagnosePull works out which of those a checkout is in. Order matters: divergence is the precise
+// answer, and untracked files never block a fast-forward, so only tracked edits count as dirty.
+func diagnosePull(dir string) (pullProblem, string) {
+	branch := strings.TrimSpace(gitOutput(dir, "rev-parse", "--abbrev-ref", "HEAD"))
+	if branch == "HEAD" {
+		return pullDetached, fmt.Sprintf("git -C %q checkout main", dir)
+	}
+
+	counts := strings.Fields(gitOutput(dir, "rev-list", "--left-right", "--count", "HEAD...@{upstream}"))
+	if len(counts) == 2 && counts[0] != "0" {
+		return pullDiverged, fmt.Sprintf("git -C %q fetch origin main && git -C %q reset --hard origin/main", dir, dir)
+	}
+
+	if strings.TrimSpace(gitOutput(dir, "status", "--porcelain", "--untracked-files=no")) != "" {
+		return pullDirty, fmt.Sprintf("git -C %q checkout -- .", dir)
+	}
+
+	return pullUnknown, fmt.Sprintf("git -C %q pull --ff-only", dir)
+}
+
+func (p pullProblem) String() string {
+	switch p {
+	case pullDetached:
+		return "it is on a detached HEAD, so there is no branch to pull"
+	case pullDiverged:
+		return "the branch has local commits the remote does not have"
+	case pullDirty:
+		return "tracked files have been edited, which blocks a fast-forward"
+	default:
+		return "the fetch itself failed"
+	}
+}
+
+func gitOutput(dir string, args ...string) string {
+	out, err := output("git", append([]string{"-C", dir}, args...)...)
+	if err != nil {
+		return ""
+	}
+	return out
 }
 
 func gitHead(dir string) string {

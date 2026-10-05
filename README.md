@@ -140,6 +140,7 @@ VencordPluginsInstaller.exe -vencord D:\Vencord   put Vencord somewhere else
 VencordPluginsInstaller.exe -branch ptb           don't ask, patch PTB
 VencordPluginsInstaller.exe -skip-inject          build only, Discord already patched
 VencordPluginsInstaller.exe -y                    never prompt (needs -branch)
+VencordPluginsInstaller.exe -allow-stale-vencord  build even if Vencord couldn't be updated
 ```
 
 #### About the Windows warning
