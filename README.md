@@ -243,6 +243,18 @@ differs before replacing it, so edits made in the wrong place are never lost sil
 | ModToolDiscord | MessagePopoverAPI (built into Vencord) |
 | FavoriteMedia + SavedTexts | Both plugins for the Texts tab in the picker |
 
+### Verified against
+
+Last checked **2026-10-05** against **Vencord v1.15.10** and Discord PTB: all six plugins type-check and
+build, and all 15 webpack patches still match the live bundle
+(`node scripts/verify-patches.mjs ptb`).
+
+These plugins track Vencord's `main` branch rather than pinning a version, so the thing that breaks
+them is an old checkout, not a new one. Vencord's lookups follow Discord's bundle, and Discord
+re-minifies constantly — a Vencord weeks behind crashes the client rather than merely misbehaving.
+Update through **Settings → Vencord → Updater**, which updates the checkout your client actually
+loads from.
+
 ---
 
 ## Publishing Changes
