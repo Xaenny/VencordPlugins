@@ -118,8 +118,15 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
                 }
             }
 
-            if (message && shouldDelete && forwarded) {
-                deleteMessage(message.channel_id, message.id);
+            // Deliberately skipped when a requested forward failed - deleting the message we just
+            // failed to keep a copy of is the one unrecoverable outcome here. Say so, though:
+            // silently not deleting is what made this look like the delete itself was broken.
+            if (message && shouldDelete) {
+                if (forwarded) {
+                    await deleteMessage(message.channel_id, message.id);
+                } else {
+                    showToast("ModTool: not deleting, because the forward failed", TOAST.FAILURE);
+                }
             }
 
             props.onClose();

@@ -92,7 +92,8 @@ export async function sendPunishment(request: PunishRequest): Promise<PunishResu
 const MESSAGE_REFERENCE_FORWARD = 1;
 
 interface MessageActions {
-    deleteMessage(channelId: string, messageId: string): void;
+    /** Async since at least 2026-10: it awaits an unarchive, then DELETEs over REST. */
+    deleteMessage(channelId: string, messageId: string, local?: boolean): Promise<void> | void;
 }
 
 let messageActions: MessageActions | null = null;
@@ -103,7 +104,21 @@ function getMessageActions(): MessageActions | null {
     if (!lookedUpMessageActions) {
         lookedUpMessageActions = true;
         try {
-            messageActions = find(filters.byProps("deleteMessage", "startEditMessage"), { isIndirect: true }) as MessageActions;
+            // Several filters, because Discord shuffles which methods live together. The object is
+            // reached through find's nested-export walk: the module exports a single key whose
+            // value is the actions object, so the props are one level down.
+            for (const props of [
+                ["deleteMessage", "startEditMessage"],
+                ["deleteMessage", "editMessage"],
+                ["deleteMessage", "sendMessage"],
+                ["deleteMessage", "revealMessage"]
+            ]) {
+                const found = find(filters.byProps(...props), { isIndirect: true }) as MessageActions | null;
+                if (typeof found?.deleteMessage === "function") {
+                    messageActions = found;
+                    break;
+                }
+            }
         } catch (err) {
             logger.error("Lookup for MessageActions threw", err);
         }
@@ -137,20 +152,35 @@ export async function forwardMessage(message: Message, targetChannelId: string) 
     return true;
 }
 
-export function deleteMessage(channelId: string, messageId: string) {
+/**
+ * Deletes the message. Discord's deleteMessage is async - it awaits an unarchive and then DELETEs
+ * over REST - so the promise has to be awaited: calling it and returning true reported success for
+ * every failure there is, because a rejected REST call never throws synchronously. A missing
+ * permission, a deleted message or a changed route all looked identical to a delete that worked.
+ */
+export async function deleteMessage(channelId: string, messageId: string) {
     const actions = getMessageActions();
     if (!actions) {
-        showToast("ModTool: couldn't delete the message", TOAST.FAILURE);
+        showToast("ModTool: couldn't delete the message - Discord's message actions weren't found", TOAST.FAILURE);
         return false;
     }
 
     try {
-        actions.deleteMessage(channelId, messageId);
+        await actions.deleteMessage(channelId, messageId);
     } catch (err) {
         logger.error("Failed to delete the message", err);
-        showToast("ModTool: couldn't delete the message", TOAST.FAILURE);
+        showToast(`ModTool: couldn't delete the message - ${describeError(err)}`, TOAST.FAILURE);
         return false;
     }
 
     return true;
+}
+
+/** Discord's REST rejections carry the interesting part in body/status, not in message. */
+function describeError(err: unknown): string {
+    const e = err as { status?: number; body?: { message?: string; code?: number; }; message?: string; } | null;
+    if (e?.body?.message) return `${e.body.message}${e.status ? ` (HTTP ${e.status})` : ""}`;
+    if (e?.status) return `HTTP ${e.status}`;
+    if (e?.message) return e.message;
+    return "see the console";
 }
