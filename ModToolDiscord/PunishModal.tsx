@@ -14,7 +14,7 @@ import { ACTIONS, PunishAction } from "./actions";
 import { SafeModal } from "./modal";
 import { commandFor, currentReason, currentTime, deleteMessage, forwardMessage, previewCommand, sendPunishment } from "./punish";
 import { settings } from "./settings";
-import { getGuildChannel, getGuildForwardChannel, getPresets, logger, setGuildChannel, setGuildForwardChannel, TOAST } from "./storage";
+import { getGuildChannel, getGuildForwardChannel, getPresets, logger, setGuildChannel, setGuildForwardChannel } from "./storage";
 
 interface PunishModalProps extends RenderModalProps {
     userId: string;
@@ -114,7 +114,7 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
                     : false;
 
                 if (!forwardChannelId) {
-                    showToast("ModTool: no forward channel set for this server", TOAST.FAILURE);
+                    showToast({ text: "ModTool: no forward channel set for this server", variant: "critical" });
                 }
             }
 
@@ -125,14 +125,14 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
                 if (forwarded) {
                     await deleteMessage(message.channel_id, message.id);
                 } else {
-                    showToast("ModTool: not deleting, because the forward failed", TOAST.FAILURE);
+                    showToast({ text: "ModTool: not deleting, because the forward failed", variant: "critical" });
                 }
             }
 
             props.onClose();
         } catch (err) {
             logger.error("Punishment handler threw", err);
-            showToast("ModTool: something went wrong - check the console", TOAST.FAILURE);
+            showToast({ text: "ModTool: something went wrong - check the console", variant: "critical" });
         } finally {
             setBusy(false);
         }

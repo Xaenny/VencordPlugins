@@ -27,14 +27,6 @@ export const cl = classNameFactory("vc-favouriteAnything-");
 
 export const logger = new Logger("FavoriteMedia");
 
-/*
- * Reading a property off Vencord's toast-type object is not safe: on a build where it isn't there,
- * the read throws a TypeError instead of returning undefined - and both uses below are inside
- * .catch() handlers, so a failed fetch would have thrown again from its own error path. The values
- * are plain strings, so use them directly.
- */
-const TOAST_FAILURE = "failure";
-
 // Discord re-minifies its bundles on every client update, so any webpack lookup can go stale at any
 // time. Vencord's find*Lazy helpers *throw* when that happens (and on dev builds they throw even with
 // devtools closed), and a throw inside a React render tears down the whole client - which is how a
@@ -265,13 +257,13 @@ function applyTitleToFilename(title: string, originalFilename: string) {
 export async function sendAttachment(attachment: FullMessageAttachment, channel: Channel) {
     const { filename, title, description } = attachment;
     const file = await fetchAttachment(attachment).catch(() =>
-        showToast(`Couldn't fetch ${filename}`, TOAST_FAILURE)
+        showToast({ text: `Couldn't fetch ${filename}`, variant: "critical" })
     );
     if (!file) return;
 
     // Using promptToUpload instead of addFiles directly since it has file size checks with error popups
     await promptToUpload([file], channel, DraftType.ChannelMessage).catch(() =>
-        showToast(`Couldn't upload ${filename}`, TOAST_FAILURE)
+        showToast({ text: `Couldn't upload ${filename}`, variant: "critical" })
     );
 
     const uploads = [...UploadAttachmentStore.getUploads(channel.id, DraftType.ChannelMessage)];

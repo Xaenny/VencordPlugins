@@ -13,7 +13,7 @@ import { ChannelStore, showToast } from "@webpack/common";
 
 import { buildCommand, PunishAction } from "./actions";
 import { settings } from "./settings";
-import { getGuildChannel, logger, TOAST } from "./storage";
+import { getGuildChannel, logger } from "./storage";
 
 export interface PunishRequest {
     action: PunishAction;
@@ -74,7 +74,7 @@ export async function sendPunishment(request: PunishRequest): Promise<PunishResu
         await sendMessage(channelId, { content });
     } catch (err) {
         logger.error("Failed to send the command", err);
-        showToast(`ModTool: couldn't send ${content}`, TOAST.FAILURE);
+        showToast({ text: `ModTool: couldn't send ${content}`, variant: "critical" });
         return { ok: false, reason: "failed" };
     }
 
@@ -82,7 +82,7 @@ export async function sendPunishment(request: PunishRequest): Promise<PunishResu
 
     if (settings.store.showSentToast) {
         const channelName = ChannelStore.getChannel(channelId)?.name;
-        showToast(`Sent to ${channelName ? "#" + channelName : "the mod channel"}: ${content}`, TOAST.SUCCESS);
+        showToast({ text: `Sent to ${channelName ? "#" + channelName : "the mod channel"}: ${content}`, variant: "success" });
     }
 
     return { ok: true, channelId, content };
@@ -145,7 +145,7 @@ export async function forwardMessage(message: Message, targetChannelId: string) 
         } as any);
     } catch (err) {
         logger.error("Failed to forward the message", err);
-        showToast("ModTool: couldn't forward the message", TOAST.FAILURE);
+        showToast({ text: "ModTool: couldn't forward the message", variant: "critical" });
         return false;
     }
 
@@ -161,7 +161,7 @@ export async function forwardMessage(message: Message, targetChannelId: string) 
 export async function deleteMessage(channelId: string, messageId: string) {
     const actions = getMessageActions();
     if (!actions) {
-        showToast("ModTool: couldn't delete the message - Discord's message actions weren't found", TOAST.FAILURE);
+        showToast({ text: "ModTool: couldn't delete the message - Discord's message actions weren't found", variant: "critical" });
         return false;
     }
 
@@ -169,7 +169,7 @@ export async function deleteMessage(channelId: string, messageId: string) {
         await actions.deleteMessage(channelId, messageId);
     } catch (err) {
         logger.error("Failed to delete the message", err);
-        showToast(`ModTool: couldn't delete the message - ${describeError(err)}`, TOAST.FAILURE);
+        showToast({ text: `ModTool: couldn't delete the message - ${describeError(err)}`, variant: "critical" });
         return false;
     }
 

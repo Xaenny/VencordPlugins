@@ -56,6 +56,12 @@ Discord. Both of these were fixed upstream *before* they were reported here:
   2026-10-03. Reading a property off a Vencord-resolved object **throws** rather than giving
   `undefined`, so a toast can abort the handler that called it.
 
+Churn also runs the other way - a *new* Vencord breaking code that was fine. v1.15.11 (2026-10-16)
+re-signed `showToast`: it takes one object now, `showToast({ text, variant })`, and the old
+`"failure"` variant is spelled `"critical"`. That one is harmless because the old two-argument call
+fails `tsc` rather than Discord, which is the general rule worth keeping: a break that the build
+catches needs no diagnosis, so run the build before suspecting the client.
+
 So before touching a plugin: check the `Vencord v… at: <commit>` line the sync script prints. If
 the crash is inside Vencord's own UI (settings, modals, the toolbox), it is not ours to fix.
 
