@@ -391,3 +391,28 @@ func TestUpstreamOfReadsTheTrackedBranch(t *testing.T) {
 		t.Fatalf("got %q/%q, want origin/master", remote, branch)
 	}
 }
+
+// The remedies are pasted into a shell, and %q would print C:\\Users\\thorb for C:\Users\thorb -
+// Go string escaping, not shell quoting. The existing path test only catches this on Windows,
+// because a Linux temp path has no backslashes to escape, so check the formatting directly.
+func TestQuotePathLeavesWindowsSeparatorsAlone(t *testing.T) {
+	got := quotePath(`C:\Users\thorb\VencordPlugins`)
+	want := `"C:\Users\thorb\VencordPlugins"`
+	if got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+	if strings.Contains(got, `\\`) {
+		t.Fatalf("%s has doubled separators", got)
+	}
+}
+
+// Same thing one level up, so a remedy that reintroduces %q is caught too.
+func TestDiagnosePullRemedyQuotesPathsForAShell(t *testing.T) {
+	_, clone := originAndCloneOn(t, "master")
+	gitIn(t, clone, "checkout", "-q", "--detach", "HEAD")
+
+	_, remedy := diagnosePull(clone)
+	if !strings.Contains(remedy, `"`+clone+`"`) {
+		t.Fatalf("remedy %q does not contain the path quoted verbatim", remedy)
+	}
+}

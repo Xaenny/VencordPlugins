@@ -384,19 +384,26 @@ const (
 func diagnosePull(dir string) (pullProblem, string) {
 	remote, branch := upstreamOf(dir)
 	if strings.TrimSpace(gitOutput(dir, "rev-parse", "--abbrev-ref", "HEAD")) == "HEAD" {
-		return pullDetached, fmt.Sprintf("git -C %q checkout %s", dir, branch)
+		return pullDetached, fmt.Sprintf("git -C %s checkout %s", quotePath(dir), branch)
 	}
 
 	counts := strings.Fields(gitOutput(dir, "rev-list", "--left-right", "--count", "HEAD...@{upstream}"))
 	if len(counts) == 2 && counts[0] != "0" {
-		return pullDiverged, fmt.Sprintf("git -C %q fetch %s %s && git -C %q reset --hard %s/%s", dir, remote, branch, dir, remote, branch)
+		return pullDiverged, fmt.Sprintf("git -C %s fetch %s %s && git -C %s reset --hard %s/%s", quotePath(dir), remote, branch, quotePath(dir), remote, branch)
 	}
 
 	if strings.TrimSpace(gitOutput(dir, "status", "--porcelain", "--untracked-files=no")) != "" {
-		return pullDirty, fmt.Sprintf("git -C %q checkout -- .", dir)
+		return pullDirty, fmt.Sprintf("git -C %s checkout -- .", quotePath(dir))
 	}
 
-	return pullUnknown, fmt.Sprintf("git -C %q pull --ff-only", dir)
+	return pullUnknown, fmt.Sprintf("git -C %s pull --ff-only", quotePath(dir))
+}
+
+// quotePath wraps a path for pasting into a shell. It cannot be %q: that is Go string syntax, so it
+// escapes the separators in a Windows path and prints C:\\Users\\thorb instead of C:\Users\thorb.
+// These remedies exist to be pasted, and one that looks wrong gets doubted instead of run.
+func quotePath(dir string) string {
+	return `"` + dir + `"`
 }
 
 // upstreamOf names the remote and branch a checkout tracks. The remedies have to use it rather than
