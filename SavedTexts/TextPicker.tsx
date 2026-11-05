@@ -7,9 +7,10 @@
 import "./style.css";
 
 import ErrorBoundary from "@components/ErrorBoundary";
+import { Heading } from "@components/Heading";
 import { DeleteIcon, PencilIcon } from "@components/Icons";
 import { findCssClassesLazy } from "@webpack";
-import { ExpressionPickerStore, Forms, openModal, TextArea, TextInput, useCallback, useEffect, useMemo, useRef, useState } from "@webpack/common";
+import { ExpressionPickerStore, openModal, TextArea, TextInput, useCallback, useEffect, useMemo, useRef, useState } from "@webpack/common";
 import { RenderModalProps } from "@vencord/discord-types";
 
 import { findComponentSafely, lazyResolve, useResizeObserver, useVirtualizedMasonry } from "../FavoriteMedia/utils";
@@ -143,11 +144,11 @@ function EditTextModal({
             ]}
         >
             <section>
-                <Forms.FormTitle tag="h5">Name</Forms.FormTitle>
+                <Heading>Name</Heading>
                 <TextInput value={name} onChange={setName} placeholder="Label for this text" />
             </section>
             <section>
-                <Forms.FormTitle tag="h5">Text</Forms.FormTitle>
+                <Heading>Text</Heading>
                 <div className="vc-saved-texts-editor">
                     <TextArea
                         value={text}
@@ -205,7 +206,7 @@ function EditPasteCountModal({
             ]}
         >
             <section>
-                <Forms.FormTitle tag="h5">Paste count</Forms.FormTitle>
+                <Heading>Paste count</Heading>
                 <TextInput
                     value={count}
                     onChange={value => setCount(value.replace(/\D/g, ""))}

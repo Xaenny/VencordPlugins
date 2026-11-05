@@ -7,10 +7,10 @@
  * on its own, so there is nowhere above them to put it. Edit one, copy it to the others.
  */
 
+import { Button } from "@components/Button";
 import { Logger } from "@utils/Logger";
 import { RenderModalProps } from "@vencord/discord-types";
 import { filters, mapMangledModule } from "@webpack";
-import { Button } from "@webpack/common";
 import { ComponentType, ReactNode } from "react";
 
 // Discord re-minifies its bundles on every client update, so any webpack lookup can go stale - and
@@ -79,10 +79,15 @@ export interface SafeModalProps extends RenderModalProps {
     children: ReactNode;
 }
 
-const COLORS = {
-    primary: "BRAND",
-    secondary: "PRIMARY",
-    danger: "RED"
+/*
+ * Our three action kinds in the vocabulary the button actually speaks. Discord's old Button.Colors
+ * names ("BRAND", "PRIMARY", "RED") went away with the compat shim in Vencord v1.15.16; these are
+ * the variants that shim mapped them to, so the buttons look the same as before.
+ */
+const VARIANTS = {
+    primary: "primary",
+    secondary: "secondary",
+    danger: "dangerPrimary"
 } as const;
 
 /** Discord's modal if this build still has one, otherwise one of our own that looks close enough. */
@@ -100,7 +105,7 @@ export function SafeModal({ title, subtitle, actions, children, onClose, ...prop
         .map(action => (
             <Button
                 key={action.text}
-                color={Button.Colors[COLORS[action.variant ?? "primary"]]}
+                variant={VARIANTS[action.variant ?? "primary"]}
                 disabled={action.disabled}
                 onClick={action.onClick}
             >

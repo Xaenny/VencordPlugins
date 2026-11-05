@@ -136,12 +136,20 @@ to update Vencord and the plugins.
 Options, from a terminal:
 
 ```
-VencordPluginsInstaller.exe -vencord D:\Vencord   put Vencord somewhere else
-VencordPluginsInstaller.exe -branch ptb           don't ask, patch PTB
-VencordPluginsInstaller.exe -skip-inject          build only, Discord already patched
-VencordPluginsInstaller.exe -y                    never prompt (needs -branch)
-VencordPluginsInstaller.exe -allow-stale-vencord  build even if Vencord couldn't be updated
+VencordPluginsInstaller.exe -vencord D:\Vencord         put Vencord somewhere else
+VencordPluginsInstaller.exe -plugins G:\VencordPlugins  use this clone, not a second one
+VencordPluginsInstaller.exe -branch ptb                 don't ask, patch PTB
+VencordPluginsInstaller.exe -skip-inject                build only, Discord already patched
+VencordPluginsInstaller.exe -y                          never prompt (needs -branch)
+VencordPluginsInstaller.exe -allow-stale-vencord        build even if Vencord couldn't be updated
+VencordPluginsInstaller.exe -allow-stale-plugins        build even if the plugins couldn't be updated
 ```
+
+A failed `git pull` of **either** repo stops the build. That is deliberate: stale plugins built
+against a freshly pulled Vencord lose the exports they import, which costs the renderer bundle and
+leaves Discord unable to start. Pass `-plugins <path>` if you keep this repo somewhere other than
+next to the exe, so the installer updates the clone you actually commit to rather than making a
+second one in your home folder.
 
 #### About the Windows warning
 
@@ -246,13 +254,22 @@ differs before replacing it, so edits made in the wrong place are never lost sil
 
 ### Verified against
 
-Last checked **2026-10-16** against **Vencord v1.15.11** and Discord PTB: all six plugins type-check and
+Last checked **2026-11-05** against **Vencord v1.15.16** and Discord PTB: all six plugins type-check and
 build, and all 15 webpack patches still match the live bundle
 (`node scripts/verify-patches.mjs ptb`).
 
-v1.15.11 changed `showToast` to take a single object (`showToast({ text, variant })`) and dropped the
-`"failure"` variant for `"critical"`; every call site here was migrated. A missed one is a type error
-at build time rather than a runtime surprise, so a build that succeeds has already checked this.
+Two Vencord releases moved the API under these plugins, and both are migrated:
+
+- **v1.15.11** changed `showToast` to a single object (`showToast({ text, variant })`) and renamed the
+  `"failure"` variant to `"critical"`.
+- **v1.15.16** finished Vencord's components migration and removed the compat shims from
+  `@webpack/common` - `Forms`, `Button`, `Text`, `Switch`, `TooltipContainer`. These now come from
+  `@components/Button`, `@components/Heading` and `@components/Text`, which are Vencord's own React
+  components rather than webpack lookups, so they cannot go stale with a Discord rebuild.
+
+A missed one of these fails the **build**, not the client, which matters more than it sounds: esbuild
+writes no renderer bundle on failure and Vencord's main process reads `renderer.js` with no guard, so
+a build error shows up as Discord refusing to start. A build that succeeds has already ruled this out.
 
 These plugins track Vencord's `main` branch rather than pinning a version, so the thing that breaks
 them is an old checkout, not a new one. Vencord's lookups follow Discord's bundle, and Discord

@@ -258,6 +258,12 @@ func gitIn(t *testing.T, dir string, args ...string) {
 // originAndClone builds a real origin repo plus a clone of it, which is the only way to exercise
 // the upstream comparisons diagnosePull makes.
 func originAndClone(t *testing.T) (origin, clone string) {
+	return originAndCloneOn(t, "main")
+}
+
+// originAndCloneOn does the same on a named default branch. Both names have to be covered: this
+// repo's default is master, Vencord's is main, and the remedies used to hardcode one of them.
+func originAndCloneOn(t *testing.T, defaultBranch string) (origin, clone string) {
 	t.Helper()
 	root := t.TempDir()
 	origin = filepath.Join(root, "origin")
@@ -266,7 +272,7 @@ func originAndClone(t *testing.T) (origin, clone string) {
 	if err := os.MkdirAll(origin, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	gitIn(t, origin, "init", "-q", "-b", "main")
+	gitIn(t, origin, "init", "-q", "-b", defaultBranch)
 	gitIn(t, origin, "config", "user.email", "t@t")
 	gitIn(t, origin, "config", "user.name", "t")
 	if err := os.WriteFile(filepath.Join(origin, "file.txt"), []byte("one\n"), 0o644); err != nil {
@@ -335,5 +341,53 @@ func TestDiagnosePullRemediesNameTheCheckout(t *testing.T) {
 	_, remedy := diagnosePull(clone)
 	if !strings.Contains(remedy, clone) {
 		t.Fatalf("remedy %q does not mention the checkout path", remedy)
+	}
+}
+
+// The remedy is a command the user pastes, so naming the wrong branch makes it fail on arrival -
+// and a command that fails gets tried before it gets doubted. This repo's default is master, so a
+// remedy mentioning "main" is the bug this locks out.
+func TestDiagnosePullRemedyNamesTheCheckoutsOwnBranch(t *testing.T) {
+	origin, clone := originAndCloneOn(t, "master")
+
+	if err := os.WriteFile(filepath.Join(origin, "file.txt"), []byte("two\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, origin, "commit", "-qam", "second")
+	gitIn(t, clone, "commit", "-q", "--allow-empty", "-m", "local only")
+	gitIn(t, clone, "fetch", "-q", "origin")
+
+	problem, remedy := diagnosePull(clone)
+	if problem != pullDiverged {
+		t.Fatalf("got %v, want pullDiverged", problem)
+	}
+	if !strings.Contains(remedy, "origin/master") {
+		t.Fatalf("remedy %q does not name origin/master", remedy)
+	}
+	if strings.Contains(remedy, "origin/main") {
+		t.Fatalf("remedy %q still names origin/main", remedy)
+	}
+}
+
+// A detached HEAD has no upstream of its own, so the branch has to come from the remote's default.
+func TestDiagnosePullDetachedRemedyNamesTheRemotesDefaultBranch(t *testing.T) {
+	_, clone := originAndCloneOn(t, "master")
+	gitIn(t, clone, "checkout", "-q", "--detach", "HEAD")
+
+	problem, remedy := diagnosePull(clone)
+	if problem != pullDetached {
+		t.Fatalf("got %v, want pullDetached", problem)
+	}
+	if !strings.Contains(remedy, "checkout master") {
+		t.Fatalf("remedy %q does not check out master", remedy)
+	}
+}
+
+func TestUpstreamOfReadsTheTrackedBranch(t *testing.T) {
+	_, clone := originAndCloneOn(t, "master")
+
+	remote, branch := upstreamOf(clone)
+	if remote != "origin" || branch != "master" {
+		t.Fatalf("got %q/%q, want origin/master", remote, branch)
 	}
 }

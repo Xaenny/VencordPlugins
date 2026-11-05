@@ -56,14 +56,36 @@ Discord. Both of these were fixed upstream *before* they were reported here:
   2026-10-03. Reading a property off a Vencord-resolved object **throws** rather than giving
   `undefined`, so a toast can abort the handler that called it.
 
-Churn also runs the other way - a *new* Vencord breaking code that was fine. v1.15.11 (2026-10-16)
-re-signed `showToast`: it takes one object now, `showToast({ text, variant })`, and the old
-`"failure"` variant is spelled `"critical"`. That one is harmless because the old two-argument call
-fails `tsc` rather than Discord, which is the general rule worth keeping: a break that the build
-catches needs no diagnosis, so run the build before suspecting the client.
+Churn also runs the other way - a *new* Vencord breaking code that was fine:
+
+- v1.15.11 (2026-10-16) re-signed `showToast`: one object now, `showToast({ text, variant })`, and
+  the old `"failure"` variant is spelled `"critical"`.
+- v1.15.16 (`2bf2440c`, 2026-10-25) finished the components migration and **deleted the compat shims
+  from `@webpack/common`**: `Forms`, `Button`, `Text`, `Switch` and `TooltipContainer` are gone.
+  They live in Vencord's own component files now - `@components/Button`, `@components/Heading`,
+  `@components/Paragraph`, `@components/Divider`, `@components/Text` - which is strictly better for
+  us, because those are real React components rather than webpack lookups that can go stale.
+  `BaseText` still exists but is `Text as never`, so it no longer type-checks as JSX; use `Text`
+  from `@components/Text`. `Forms.FormTitle tag="h5"` becomes a plain `<Heading>` - h5 is its
+  default.
 
 So before touching a plugin: check the `Vencord v… at: <commit>` line the sync script prints. If
 the crash is inside Vencord's own UI (settings, modals, the toolbox), it is not ours to fix.
+
+### A failed build is why Discord will not start
+
+Worth knowing on its own, because it looks like a Discord problem rather than a build one. A missing
+export fails **esbuild**, not just `tsc`, and esbuild writes nothing on failure - so `dist/renderer.js`
+never gets written. Vencord's main process then does this, at `src/main/ipcMain.ts`:
+
+```js
+e.returnValue = readFileSync(join(__dirname, "renderer.js"), "utf-8");
+```
+
+No try/catch. A missing renderer bundle throws in the main process, and Discord does not start at
+all. So "Discord won't start" after an update means **read the build output**, not the client: the
+patcher, preload and main bundles are written before the renderer and will all say `Done in …ms`
+while the renderer is the one that failed.
 
 #### When Vencord will not update, get git's stderr - do not infer
 
@@ -119,6 +141,29 @@ start, and `REVISION` in `FavoriteMedia/index.tsx` must be bumped whenever that 
 `scripts/install.ps1` (via `install.bat`) sets up Vencord, the plugins and a dev build from
 scratch, and updates all of it when re-run. `scripts/sync-to-vencord.ps1` does just the
 copy-and-build half. Both were executed for real against a Vencord checkout, not only written.
+
+### There must be exactly one clone of this repo
+
+The installer's `-plugins` default is "next to this exe, else `%USERPROFILE%\VencordPlugins`", so
+running the exe from anywhere but `G:\VencordPlugins` silently creates and then keeps updating a
+**second clone** at `C:\Users\thorb\VencordPlugins`. Both are called VencordPlugins, both look
+right in any log line that prints only a commit subject, and only one of them is the one being
+committed to.
+
+That is what broke the client on 2026-11-05. The second clone still sat on the **pre-rewrite
+history** from the authorised re-authoring, so `git pull --ff-only` saw two unrelated lineages and
+refused with "Not possible to fast-forward". It had been stuck 17 commits / since 2026-09-10 ever
+since, and the giveaway is subtle: `git log` shows the right commit *subject* under the wrong SHA
+(`ef61948` locally for what is `a37302c` upstream). The installer updated Vencord to v1.15.16,
+built two-month-old plugins against it, lost the renderer bundle to the missing exports, and Discord
+stopped starting - with every step before the build printing a tick.
+
+So: `git -C <clone> log -1` is not enough to tell two clones apart; compare the **SHA** against
+`origin/master`. A diverged plugins clone whose commits are only rewritten duplicates has nothing to
+preserve, and `git fetch origin master && git reset --hard origin/master` is the fix. A failed
+plugins pull is now **fatal** in the installer for exactly this reason (`-allow-stale-plugins`
+overrides), because "stale plugins merely lag behind" turned out to be false - stale plugins against
+a fresh Vencord is a client that will not launch.
 
 
 Plugins must be **copied** into `src\userplugins`. Junctions and symlinks break the build:

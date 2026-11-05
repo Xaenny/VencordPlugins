@@ -6,9 +6,10 @@
  * See LICENSE in this directory for redistribution terms.
  */
 
+import { Button } from "@components/Button";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { Message, RenderModalProps } from "@vencord/discord-types";
-import { Button, ChannelStore, openModal, SelectedChannelStore, showToast, TextInput, UserStore, useState } from "@webpack/common";
+import { ChannelStore, openModal, SelectedChannelStore, showToast, TextInput, UserStore, useState } from "@webpack/common";
 
 import { ACTIONS, PunishAction } from "./actions";
 import { SafeModal } from "./modal";
@@ -182,7 +183,7 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
                         <span className="vc-modtool-channel-current">
                             {channel ? `#${channel.name}` : channelId || "No channel set for this server"}
                         </span>
-                        <Button size={Button.Sizes.SMALL} onClick={useCurrentChannel}>Use current channel</Button>
+                        <Button size="small" onClick={useCurrentChannel}>Use current channel</Button>
                     </div>
                 </section>
 
@@ -210,7 +211,7 @@ function PunishModal({ userId: initialUserId, guildId, action, message, ...props
                                         ? `Forwarding to #${forwardChannel.name}`
                                         : forwardChannelId || "No forward channel set for this server"}
                                 </span>
-                                <Button size={Button.Sizes.SMALL} onClick={useCurrentForwardChannel}>
+                                <Button size="small" onClick={useCurrentForwardChannel}>
                                     Use current channel
                                 </Button>
                             </div>

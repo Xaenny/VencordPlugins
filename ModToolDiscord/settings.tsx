@@ -7,11 +7,12 @@
  */
 
 import { definePluginSettings } from "@api/Settings";
+import { Button } from "@components/Button";
 import { Heading } from "@components/Heading";
 import { Paragraph } from "@components/Paragraph";
 import { useForceUpdater } from "@utils/react";
 import { OptionType } from "@utils/types";
-import { Button, ChannelStore, GuildStore, TextInput, useState } from "@webpack/common";
+import { ChannelStore, GuildStore, TextInput, useState } from "@webpack/common";
 
 import { ACTIONS } from "./actions";
 import { addPreset, getGuildChannels, getGuildForwardChannels, getPresets, PresetKind, removePreset, setGuildChannel, setGuildForwardChannel } from "./storage";
@@ -52,7 +53,7 @@ function PresetChips({ kind, placeholder }: { kind: PresetKind; placeholder: str
                     onChange={setDraft}
                     onKeyDown={(e: React.KeyboardEvent) => { if (e.key === "Enter") add(); }}
                 />
-                <Button size={Button.Sizes.SMALL} onClick={add} disabled={!draft.trim()}>Add</Button>
+                <Button size="small" onClick={add} disabled={!draft.trim()}>Add</Button>
             </div>
         </div>
     );
@@ -109,8 +110,8 @@ function GuildChannelsSetting() {
                                         `, forwards -> #${ChannelStore.getChannel(forwardChannels[guildId])?.name ?? forwardChannels[guildId]}`}
                                 </span>
                                 <Button
-                                    size={Button.Sizes.SMALL}
-                                    color={Button.Colors.RED}
+                                    size="small"
+                                    variant="dangerPrimary"
                                     onClick={() => {
                                         setGuildChannel(guildId, null);
                                         setGuildForwardChannel(guildId, null);

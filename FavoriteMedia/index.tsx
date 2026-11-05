@@ -26,7 +26,7 @@ export const EmbedContext = proxyLazyWebpack(() => React.createContext<null | Fu
 export const EmbedMosaicContext = proxyLazyWebpack(() => React.createContext<null | number>(null));
 
 // Bumped whenever this plugin changes, so the console says which build is actually loaded
-const REVISION = "2026-10-16 toasts-api";
+const REVISION = "2026-11-05 v1.15.16-components";
 
 const ButtonWrapperClasses = findCssClassesLazy("button", "buttonWrapper", "notificationDot");
 const ChannelTextAreaClasses = findCssClassesLazy("buttonContainer", "channelTextArea", "button");
@@ -156,8 +156,20 @@ export default definePlugin({
         {
             find: /\.track\([A-Za-z_$][\w$]*\.[A-Za-z_$][\w$]*\.GIF_FAVORITED,\{total_num_favorited:/,
             replacement: {
-                match: /function (\i)\((\i)\)\{(\i\.\i)\.updateAsync\("favoriteGifs",/,
-                replace: "async function $1($2){$2=await $self.interceptAddToFavourites({...$2,url:$2.url});if(null==$2)return;$3.updateAsync(\"favoriteGifs\","
+                /*
+                 * The favourite-*add* action. Discord moved it out of a named function declaration
+                 * and into an anonymous property on the module's export object, so there is no name
+                 * left to match on - and the unfavourite action sitting a few properties earlier is
+                 * identical up to its body, so matching the shape alone would wrap the wrong one
+                 * (and it comes first, which is the one a non-global replace would take).
+                 *
+                 * The lookahead is the discriminator, and it is a property rather than a distance:
+                 * this is the body that reaches .GIF_FAVORITED without passing .GIF_UNFAVORITED on
+                 * the way. The leading dot matters - "GIF_UNFAVORITED" ends in "FAVORITED" and would
+                 * otherwise match both.
+                 */
+                match: /:function\((\i)\)\{(\i\.\i)\.updateAsync\("favoriteGifs",(?=(?:(?!\.GIF_UNFAVORITED)[\s\S])*?\.GIF_FAVORITED)/,
+                replace: ":async function($1){$1=await $self.interceptAddToFavourites({...$1,url:$1.url});if(null==$1)return;$2.updateAsync(\"favoriteGifs\","
             }
         }
     ],

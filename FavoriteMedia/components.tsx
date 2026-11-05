@@ -4,9 +4,9 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { BaseText } from "@components/BaseText";
 import { Button } from "@components/Button";
 import ErrorBoundary from "@components/ErrorBoundary";
+import { Text } from "@components/Text";
 import { findCssClassesLazy } from "@webpack";
 import { ChannelStore, ExpressionPickerStore, ListScrollerThin, lodash, PermissionsBits, PermissionStore, React, useCallback, useEffect, useMemo, useRef, useState, useStateFromStores } from "@webpack/common";
 import { ComponentProps, ComponentType, ReactNode, Ref } from "react";
@@ -127,10 +127,10 @@ export function AttachmentPreview({ attachment }: AttachmentsComponentProps) {
                 </svg>
             </div>
             <div className={cl("simple-preview-meta")}>
-                <BaseText className={cl("simple-preview-name")}>{attachment.filename || "file"}</BaseText>
-                <BaseText className={cl("simple-preview-size")}>{formatFileSize(attachment.size ?? 0)}</BaseText>
+                <Text className={cl("simple-preview-name")}>{attachment.filename || "file"}</Text>
+                <Text className={cl("simple-preview-size")}>{formatFileSize(attachment.size ?? 0)}</Text>
                 {attachment.title && (
-                    <BaseText className={cl("simple-preview-description")}>{attachment.title}</BaseText>
+                    <Text className={cl("simple-preview-description")}>{attachment.title}</Text>
                 )}
             </div>
         </div>
@@ -298,7 +298,7 @@ function ImagePickerInner({ onSelectItem }: FilePickerProps) {
                 </div>
             ) : (
                 <div className={cl("container-body", "container-info")} inert>
-                    <BaseText className={cl("info-text")}>No images match your search.</BaseText>
+                    <Text className={cl("info-text")}>No images match your search.</Text>
                 </div>
             )}
         </div>
@@ -373,7 +373,7 @@ function VideoPickerInner({ onSelectItem }: FilePickerProps) {
                 </div>
             ) : (
                 <div className={cl("container-body", "container-info")} inert>
-                    <BaseText className={cl("info-text")}>No videos match your search.</BaseText>
+                    <Text className={cl("info-text")}>No videos match your search.</Text>
                 </div>
             )}
         </div>
@@ -381,7 +381,7 @@ function VideoPickerInner({ onSelectItem }: FilePickerProps) {
 }
 
 function EmptyList() {
-    return <BaseText className={cl("info-text")}>No files match your search.</BaseText>;
+    return <Text className={cl("info-text")}>No files match your search.</Text>;
 }
 
 const demoAttachment: FullMessageAttachment = {
@@ -408,11 +408,11 @@ function Demo() {
                     format={FavouriteItemFormat.NONE}
                 />
             </div>
-            <BaseText className={cl("info-text")}>
+            <Text className={cl("info-text")}>
                 Click the star to favourite a file.
                 <br />
                 Favourite files will show up here!
-            </BaseText>
+            </Text>
         </>
     );
 }

@@ -47,17 +47,18 @@ var branches = []discordBranch{
 
 func main() {
 	var (
-		vencordPath = flag.String("vencord", "", "Where Vencord lives or should be cloned (default: %USERPROFILE%\\Vencord)")
-		pluginsPath = flag.String("plugins", "", "The plugin repo (default: next to this exe, else cloned into %USERPROFILE%\\VencordPlugins)")
-		branchName  = flag.String("branch", "", "Discord to patch: stable, ptb or canary (default: ask)")
-		skipInject  = flag.Bool("skip-inject", false, "Build everything but leave Discord alone")
-		assumeYes   = flag.Bool("y", false, "Never prompt - fails instead of asking")
-		allowStale  = flag.Bool("allow-stale-vencord", false, "Build even if Vencord could not be updated")
+		vencordPath       = flag.String("vencord", "", "Where Vencord lives or should be cloned (default: %USERPROFILE%\\Vencord)")
+		pluginsPath       = flag.String("plugins", "", "The plugin repo (default: next to this exe, else cloned into %USERPROFILE%\\VencordPlugins)")
+		branchName        = flag.String("branch", "", "Discord to patch: stable, ptb or canary (default: ask)")
+		skipInject        = flag.Bool("skip-inject", false, "Build everything but leave Discord alone")
+		assumeYes         = flag.Bool("y", false, "Never prompt - fails instead of asking")
+		allowStale        = flag.Bool("allow-stale-vencord", false, "Build even if Vencord could not be updated")
+		allowStalePlugins = flag.Bool("allow-stale-plugins", false, "Build even if the plugins could not be updated")
 	)
 	flag.Parse()
 	initUI()
 
-	if err := run(*vencordPath, *pluginsPath, *branchName, *skipInject, *assumeYes, *allowStale); err != nil {
+	if err := run(*vencordPath, *pluginsPath, *branchName, *skipInject, *assumeYes, *allowStale, *allowStalePlugins); err != nil {
 		fmt.Println()
 		fail("%v", err)
 		waitForExit(*assumeYes)
@@ -67,7 +68,7 @@ func main() {
 	waitForExit(*assumeYes)
 }
 
-func run(vencordPath, pluginsPath, branchName string, skipInject, assumeYes, allowStale bool) error {
+func run(vencordPath, pluginsPath, branchName string, skipInject, assumeYes, allowStale, allowStalePlugins bool) error {
 	banner()
 
 	if vencordPath == "" {
@@ -89,7 +90,18 @@ func run(vencordPath, pluginsPath, branchName string, skipInject, assumeYes, all
 	if pluginsStale {
 		problem, remedy := diagnosePull(pluginsPath)
 		warn("couldn't update the plugins - %s", problem)
-		info("the build will use the commit already checked out; fix it with: %s", remedy)
+		info("fix it with: %s", remedy)
+
+		// Stale plugins were filed under "merely lags behind" here, and that was wrong. These sources
+		// get built against the Vencord pulled one step below, and a Vencord that moved on deletes the
+		// exports they import: esbuild then writes no renderer bundle at all, while Vencord's main
+		// process readFileSync's renderer.js with no guard - so Discord stops starting. A forgotten
+		// second clone of this repo, two months behind, took the client down that way while every
+		// step before this one printed OK.
+		if !allowStalePlugins {
+			return fmt.Errorf("refusing to build plugins that could not be updated (pass -allow-stale-plugins to override)")
+		}
+		warn("-allow-stale-plugins given - building from what is on disk anyway")
 	}
 	ok("plugins in %s", pluginsPath)
 	if head := gitHead(pluginsPath); head != "" {
@@ -370,14 +382,14 @@ const (
 // diagnosePull works out which of those a checkout is in. Order matters: divergence is the precise
 // answer, and untracked files never block a fast-forward, so only tracked edits count as dirty.
 func diagnosePull(dir string) (pullProblem, string) {
-	branch := strings.TrimSpace(gitOutput(dir, "rev-parse", "--abbrev-ref", "HEAD"))
-	if branch == "HEAD" {
-		return pullDetached, fmt.Sprintf("git -C %q checkout main", dir)
+	remote, branch := upstreamOf(dir)
+	if strings.TrimSpace(gitOutput(dir, "rev-parse", "--abbrev-ref", "HEAD")) == "HEAD" {
+		return pullDetached, fmt.Sprintf("git -C %q checkout %s", dir, branch)
 	}
 
 	counts := strings.Fields(gitOutput(dir, "rev-list", "--left-right", "--count", "HEAD...@{upstream}"))
 	if len(counts) == 2 && counts[0] != "0" {
-		return pullDiverged, fmt.Sprintf("git -C %q fetch origin main && git -C %q reset --hard origin/main", dir, dir)
+		return pullDiverged, fmt.Sprintf("git -C %q fetch %s %s && git -C %q reset --hard %s/%s", dir, remote, branch, dir, remote, branch)
 	}
 
 	if strings.TrimSpace(gitOutput(dir, "status", "--porcelain", "--untracked-files=no")) != "" {
@@ -385,6 +397,28 @@ func diagnosePull(dir string) (pullProblem, string) {
 	}
 
 	return pullUnknown, fmt.Sprintf("git -C %q pull --ff-only", dir)
+}
+
+// upstreamOf names the remote and branch a checkout tracks. The remedies have to use it rather than
+// a fixed name: this repo's default branch is master and Vencord's is main, so one hardcoded name
+// printed a command that fails on the other - and a remedy that does not run is worse than none,
+// because it gets tried before it gets doubted.
+func upstreamOf(dir string) (remote, branch string) {
+	// Cut on the first slash only, so a branch with slashes in it survives.
+	if ref := strings.TrimSpace(gitOutput(dir, "rev-parse", "--abbrev-ref", "HEAD@{upstream}")); ref != "" {
+		if r, b, ok := strings.Cut(ref, "/"); ok {
+			return r, b
+		}
+	}
+
+	// Detached HEAD has no upstream of its own, so fall back to what the remote says its default is.
+	if ref := strings.TrimSpace(gitOutput(dir, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")); ref != "" {
+		if _, b, ok := strings.Cut(ref, "/"); ok {
+			return "origin", b
+		}
+	}
+
+	return "origin", "main"
 }
 
 func (p pullProblem) String() string {
