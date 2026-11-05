@@ -90,6 +90,25 @@ func run(vencordPath, pluginsPath, branchName string, skipInject, assumeYes, all
 	if pluginsStale {
 		problem, remedy := diagnosePull(pluginsPath)
 		warn("couldn't update the plugins - %s", problem)
+
+		// A history rewrite leaves a clone holding the same commits under different SHAs, and git can
+		// only report that as a divergence - there is no "your history was rewritten" to report. The
+		// change is already upstream, so there is nothing to preserve and nothing to ask about:
+		// repair it rather than printing a command and quitting. Printing one got this wall hit three
+		// times in a row, because the remedy is a context switch away from double-clicking an exe.
+		if problem == pullDiverged && onlyRewrittenCommits(pluginsPath) {
+			info("every local commit is already upstream under a different SHA - rewritten history")
+			info("resetting the clone to match (recoverable from git's reflog)")
+			if repaired := resetToUpstream(pluginsPath); repaired {
+				ok("plugins repaired and updated")
+				pluginsStale = false
+			} else {
+				warn("the reset did not take - fix it by hand: %s", remedy)
+			}
+		}
+	}
+	if pluginsStale {
+		_, remedy := diagnosePull(pluginsPath)
 		info("fix it with: %s", remedy)
 
 		// Stale plugins were filed under "merely lags behind" here, and that was wrong. These sources
@@ -397,6 +416,44 @@ func diagnosePull(dir string) (pullProblem, string) {
 	}
 
 	return pullUnknown, fmt.Sprintf("git -C %s pull --ff-only", quotePath(dir))
+}
+
+// onlyRewrittenCommits reports whether every commit this branch has and its upstream lacks is a
+// rewritten duplicate - the same change under a different SHA. git cherry answers exactly that: it
+// marks a commit "-" when an equivalent change is already upstream and "+" when it is genuinely new,
+// so a listing with no "+" has nothing that a reset would lose.
+//
+// The dirty check matters as much as the cherry one: reset --hard discards uncommitted edits too, and
+// those are never recoverable from the reflog.
+func onlyRewrittenCommits(dir string) bool {
+	if strings.TrimSpace(gitOutput(dir, "status", "--porcelain", "--untracked-files=no")) != "" {
+		return false
+	}
+
+	remote, branch := upstreamOf(dir)
+	listing := strings.TrimSpace(gitOutput(dir, "cherry", remote+"/"+branch, "HEAD"))
+	if listing == "" {
+		return false // nothing local to compare, so this is not the case being repaired
+	}
+
+	for _, line := range strings.Split(listing, "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(line), "-") {
+			return false
+		}
+	}
+	return true
+}
+
+// resetToUpstream puts the branch back on its upstream and reports whether it worked.
+func resetToUpstream(dir string) bool {
+	remote, branch := upstreamOf(dir)
+	if err := runIn(dir, "git", "fetch", remote, branch); err != nil {
+		return false
+	}
+	if err := runIn(dir, "git", "reset", "--hard", remote+"/"+branch); err != nil {
+		return false
+	}
+	return true
 }
 
 // quotePath wraps a path for pasting into a shell. It cannot be %q: that is Go string syntax, so it

@@ -159,11 +159,17 @@ built two-month-old plugins against it, lost the renderer bundle to the missing 
 stopped starting - with every step before the build printing a tick.
 
 So: `git -C <clone> log -1` is not enough to tell two clones apart; compare the **SHA** against
-`origin/master`. A diverged plugins clone whose commits are only rewritten duplicates has nothing to
-preserve, and `git fetch origin master && git reset --hard origin/master` is the fix. A failed
-plugins pull is now **fatal** in the installer for exactly this reason (`-allow-stale-plugins`
+`origin/master`. A failed plugins pull is now **fatal** in the installer (`-allow-stale-plugins`
 overrides), because "stale plugins merely lag behind" turned out to be false - stale plugins against
 a fresh Vencord is a client that will not launch.
+
+The installer also **repairs this case itself** now, because printing `git reset --hard` and quitting
+got the same wall hit three runs in a row: a remedy you have to go and paste is a context switch away
+from double-clicking an exe, so it does not get run. `git cherry <upstream> HEAD` is what makes that
+safe to automate - it compares patch ids, so it marks a rewritten duplicate `-` and genuinely new
+work `+`. No `+` lines and a clean tree means the reset provably loses nothing, and the installer
+just does it. Either guard failing, and it refuses and prints the command instead. The dirty check is
+not optional: `reset --hard` discards uncommitted edits too, and the reflog cannot give those back.
 
 
 Plugins must be **copied** into `src\userplugins`. Junctions and symlinks break the build:

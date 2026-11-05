@@ -416,3 +416,84 @@ func TestDiagnosePullRemedyQuotesPathsForAShell(t *testing.T) {
 		t.Fatalf("remedy %q does not contain the path quoted verbatim", remedy)
 	}
 }
+
+// writeIn is for the rewritten-history fixtures below, which need real content changes: an empty
+// commit has an empty diff, and git cherry compares patch ids.
+func writeIn(t *testing.T, dir, name, body string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// rewrittenClone reproduces what an authorised history rewrite does to a clone that already pulled:
+// the clone keeps a commit whose change is upstream under a different SHA, and upstream has moved on.
+// git can only call that a divergence, which is the whole reason it needs detecting by content.
+func rewrittenClone(t *testing.T) (origin, clone string) {
+	t.Helper()
+	origin, clone = originAndCloneOn(t, "master")
+
+	writeIn(t, origin, "file.txt", "two\n")
+	gitIn(t, origin, "commit", "-qam", "second")
+	gitIn(t, clone, "pull", "-q", "--ff-only")
+
+	// same diff, new SHA - then upstream carries on past it
+	gitIn(t, origin, "commit", "-q", "--amend", "--no-edit", "--date", "2020-01-01T00:00:00")
+	writeIn(t, origin, "file.txt", "three\n")
+	gitIn(t, origin, "commit", "-qam", "third")
+	gitIn(t, clone, "fetch", "-q", "origin")
+	return origin, clone
+}
+
+func TestOnlyRewrittenCommitsSpotsADuplicatedChange(t *testing.T) {
+	_, clone := rewrittenClone(t)
+
+	if got, _ := diagnosePull(clone); got != pullDiverged {
+		t.Fatalf("fixture is not diverged: got %v", got)
+	}
+	if !onlyRewrittenCommits(clone) {
+		t.Fatal("a rewritten duplicate was not recognised, so the installer would refuse to repair it")
+	}
+}
+
+// The guard that matters: real unpushed work must never be reset away.
+func TestOnlyRewrittenCommitsRefusesGenuineLocalWork(t *testing.T) {
+	_, clone := rewrittenClone(t)
+
+	writeIn(t, clone, "mine.txt", "work nobody else has\n")
+	gitIn(t, clone, "add", ".")
+	gitIn(t, clone, "commit", "-qm", "local work")
+
+	if onlyRewrittenCommits(clone) {
+		t.Fatal("would have reset away a commit that exists nowhere upstream")
+	}
+}
+
+// reset --hard discards uncommitted edits too, and those the reflog cannot give back.
+func TestOnlyRewrittenCommitsRefusesADirtyTree(t *testing.T) {
+	_, clone := rewrittenClone(t)
+	writeIn(t, clone, "file.txt", "edited but not committed\n")
+
+	if onlyRewrittenCommits(clone) {
+		t.Fatal("would have discarded uncommitted edits")
+	}
+}
+
+func TestResetToUpstreamLandsOnTheUpstreamCommit(t *testing.T) {
+	_, clone := rewrittenClone(t)
+
+	if !resetToUpstream(clone) {
+		t.Fatal("reset reported failure")
+	}
+
+	head := strings.TrimSpace(gitOutput(clone, "rev-parse", "HEAD"))
+	want := strings.TrimSpace(gitOutput(clone, "rev-parse", "origin/master"))
+	if head != want || head == "" {
+		t.Fatalf("HEAD is %q, want %q", head, want)
+	}
+
+	// and the thing the installer actually needed: the next pull is a no-op rather than a refusal
+	if got, _ := diagnosePull(clone); got == pullDiverged {
+		t.Fatal("still diverged after the repair")
+	}
+}
